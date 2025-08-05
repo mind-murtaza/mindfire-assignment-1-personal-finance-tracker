@@ -1,0 +1,17 @@
+# Git
+.git
+.gitignore
+
+# Local dependencies
+node_modules
+packages/client/node_modules
+packages/server/node_modules
+
+# Environment files (should be passed via docker-compose)
+.env
+packages/server/.env
+packages/client/.env
+
+# IDE / OS specific
+.DS_Store
+npm-debug.log
