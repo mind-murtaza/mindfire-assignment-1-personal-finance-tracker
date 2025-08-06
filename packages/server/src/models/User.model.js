@@ -137,11 +137,18 @@ UserSchema.index({ status: 1, lastLoginAt: -1 }, { background: true });
  */
 UserSchema.pre("save", async function (next) {
 	try {
-		// STEP 1: VALIDATE THE ENTIRE DOCUMENT WITH ZOD
-		// This is the single source of truth for business rule validation.
-		// It checks all fields, including the plain-text password for strength.
+		// STEP 1: VALIDATE NEW DOCUMENTS ONLY WITH ZOD
+		// For new documents, we validate the complete user object
 		if (this.isNew) {
-			const validation = createUserSchema.safeParse(this.toObject());
+            // For new documents, we construct a plain object to avoid passing Mongoose-added fields to Zod
+            const plainUserObject = {
+                email: this.email,
+                password: this.password,
+                profile: this.profile,
+                settings: this.settings,
+                status: this.status
+            };
+			const validation = createUserSchema.safeParse(plainUserObject);
 			if (!validation.success) {
 				const error = new Error(validation.error.issues[0].message);
 				error.name = "ValidationError";
@@ -152,25 +159,12 @@ UserSchema.pre("save", async function (next) {
 			this.email = email;
 			this.profile.firstName = profile.firstName;
 			this.profile.lastName = profile.lastName;
-		} else {
-			// For updates, validate only the modified fields
-			const modifiedPaths = this.modifiedPaths();
-			if (modifiedPaths.length > 0) {
-				const dataToUpdate = modifiedPaths.reduce((acc, path) => {
-					acc[path] = this.get(path);
-					return acc;
-				}, {});
-				const validation = updateUserSchema.partial().safeParse(dataToUpdate);
-				if (!validation.success) {
-					const error = new Error(validation.error.issues[0].message);
-					error.name = "ValidationError";
-					return next(error);
-				}
-			}
 		}
+		// For updates: NO validation here. Updates should be validated at API layer.
+		// This keeps the model simple and follows single responsibility principle.
 
 		// STEP 2: SECURELY TRANSFORM THE PASSWORD (IF MODIFIED)
-		// This runs only after the password has passed validation in Step 1.
+		// This runs for both new documents and updates when password is modified
 		if (this.isModified("password")) {
 			const saltRounds = 12;
 			this.password = await bcrypt.hash(this.password, saltRounds);
@@ -183,7 +177,7 @@ UserSchema.pre("save", async function (next) {
 });
 
 // =================================================================
-//                      INSTANCE METHODS
+//                       STATIC METHODS
 // =================================================================
 
 /**
@@ -200,6 +194,11 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
 		throw new Error("Password comparison failed");
 	}
 };
+
+// =================================================================
+//                      INSTANCE METHODS
+// =================================================================
+
 
 /**
  * Get user's full name
