@@ -1,3 +1,8 @@
 /node_modules
 /dist
 .env
+.DS_Store
+Agent.md
+log.md
+todo.md
+coverage/*
