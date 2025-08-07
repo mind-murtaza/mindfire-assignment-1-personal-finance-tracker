@@ -16,7 +16,6 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const {
 	createUserSchema,
-	updateUserSchema,
 } = require("../schemas");
 
 const { Schema } = mongoose;

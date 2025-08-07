@@ -1,11 +1,17 @@
 const { z } = require("zod");
+const { ObjectId } = require("mongodb");
 const { CURRENCY_CODES } = require("../constants/currencies");
+
 /**
  * ObjectId validation - MongoDB ObjectId format
  */
 const objectIdSchema = z
-	.string()
-	.regex(/^[0-9a-fA-F]{24}$/, "Invalid ObjectId format")
+	.union([
+		z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid ObjectId format"),
+		z.instanceof(ObjectId),
+	])
+	.transform((val) => (typeof val === "string" ? val : val.toString()))
+	.refine((val) => /^[0-9a-fA-F]{24}$/.test(val), "Invalid ObjectId format")
 	.describe("MongoDB ObjectId");
 
 /**
