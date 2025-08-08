@@ -545,6 +545,20 @@ CategorySchema.statics.getDefaultCategory = function(userId, type) {
   return this.findOne({ userId, type, isDefault: true, isDeleted: false });
 };
 
+/**
+ * Ensure all indexes are created (production optimization)
+ * @returns {Promise<void>}
+ */
+CategorySchema.statics.ensureIndexes = async function() {
+  try {
+    await this.ensureIndexes();
+    console.log('✅ Category model indexes ensured successfully');
+  } catch (error) {
+    console.error('❌ Error ensuring Category indexes:', error.message);
+    throw error;
+  }
+};
+
 // =================================================================
 //                      VIRTUAL PROPERTIES
 // =================================================================

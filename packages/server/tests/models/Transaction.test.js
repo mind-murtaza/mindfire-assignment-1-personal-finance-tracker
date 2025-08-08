@@ -82,10 +82,6 @@ describe('Transaction Model - Murtaza\'s Adversarial Testing Suite', () => {
         parentId: user2ExpenseCategory._id,
     });
     await user2ExpenseSubCategory.save();
-
-    console.log('🚀 GLOBAL TEST SETUP COMPLETE:');
-    console.log(`   Users: ${testUser1.email}, ${testUser2.email}`);
-    console.log(`   Categories: 6 total (3 per user)`);
   });
 
   afterAll(async () => {
@@ -99,7 +95,6 @@ describe('Transaction Model - Murtaza\'s Adversarial Testing Suite', () => {
     await User.deleteMany({ 
       _id: { $in: [testUser1._id, testUser2._id] } 
     });
-    console.log('🧹 GLOBAL TEST CLEANUP COMPLETE');
   });
 
 
@@ -125,8 +120,6 @@ describe('Transaction Model - Murtaza\'s Adversarial Testing Suite', () => {
     });
     
     if (categoryCount < 6) {
-      console.log(`⚠️  Only ${categoryCount}/6 categories found, recreating...`);
-      
       // Delete any existing categories and recreate all
       await Category.deleteMany({ userId: { $in: [testUser1._id, testUser2._id] } });
       
