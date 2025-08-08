@@ -14,7 +14,7 @@
 
 require('dotenv').config();
 const app = require('./app');
-const connectDB = require('./config/db.js');
+const { connectDB } = require('./config/db.js');
 
 // =================================================================
 //                    SERVER CONFIGURATION
@@ -98,18 +98,6 @@ const startServer = async () => {
     await connectDB();
     console.log('✅ Database connection established');
 
-    // Step 3: Ensure indexes (production optimization)
-    if (NODE_ENV === 'production') {
-      console.log('📊 Ensuring database indexes...');
-      const { User, Category, Transaction } = require('./models');
-      await Promise.all([
-        User.ensureIndexes(),
-        Category.ensureIndexes(),
-        Transaction.ensureIndexes()
-      ]);
-      console.log('✅ Database indexes verified');
-    }
-
     // Step 4: Start HTTP server
     console.log(`🌐 Starting HTTP server on port ${PORT}...`);
     serverInstance = app.listen(PORT, '0.0.0.0', () => {
@@ -179,8 +167,8 @@ const gracefulShutdown = async (signal) => {
   // Step 2: Close database connections
   try {
     console.log('🗄️  Closing database connections...');
-    const mongoose = require('mongoose');
-    await mongoose.connection.close();
+    const { disconnect } = require('./config/db.js');
+    await disconnect();
     console.log('✅ Database connections closed');
   } catch (error) {
     console.error('❌ Error closing database:', error.message);

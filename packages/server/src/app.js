@@ -151,27 +151,45 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Detailed health check for monitoring systems
+ * Detailed health check for monitoring systems with database status
  * @route GET /health
  * @returns {Object} Detailed system health status
  */
 app.get('/health', (req, res) => {
+  const { isConnected, getConnectionInfo } = require('./config/db.js');
+  const dbConnected = isConnected();
+  const dbInfo = dbConnected ? getConnectionInfo() : null;
+  
   const healthCheck = {
     success: true,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    status: 'healthy',
+    status: dbConnected ? 'healthy' : 'degraded',
     services: {
       api: 'operational',
-      database: 'operational', // TODO: Add actual DB health check
+      database: dbConnected ? 'connected' : 'disconnected'
     },
-    memory: {
-      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
-      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
+    database: dbConnected ? {
+      state: dbInfo.state,
+      name: dbInfo.name,
+      collections: dbInfo.collections.length
+    } : {
+      state: 'disconnected',
+      error: 'Database connection not available'
+    },
+    system: {
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
+      },
+      pid: process.pid,
+      nodeVersion: process.version,
+      environment: process.env.NODE_ENV || 'development'
     }
   };
   
-  res.status(200).json(healthCheck);
+  const statusCode = dbConnected ? 200 : 503;
+  res.status(statusCode).json(healthCheck);
 });
 
 // =================================================================

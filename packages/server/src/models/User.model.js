@@ -275,22 +275,7 @@ UserSchema.statics.findActiveUsers = async function (options = {}) {
 	return { users, total };
 };
 
-/**
- * Ensure all indexes are created (production optimization)
- * Note: Mongoose automatically creates schema indexes, but this method
- * provides explicit control for production deployments and monitoring.
- * @returns {Promise<void>}
- */
-UserSchema.statics.ensureIndexes = async function() {
-	try {
-		// Use Mongoose's built-in method to ensure schema indexes are created
-		await this.ensureIndexes();
-		console.log('✅ User model indexes ensured successfully');
-	} catch (error) {
-		console.error('❌ Error ensuring User indexes:', error.message);
-		throw error;
-	}
-};
+
 
 // =================================================================
 //                      VIRTUAL PROPERTIES

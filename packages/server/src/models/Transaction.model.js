@@ -672,19 +672,7 @@ TransactionSchema.statics.validateData = function(transactionData, isUpdate = fa
   return schema.safeParse(transactionData);
 };
 
-/**
- * Ensure all indexes are created (production optimization)
- * @returns {Promise<void>}
- */
-TransactionSchema.statics.ensureIndexes = async function() {
-  try {
-    await this.ensureIndexes();
-    console.log('✅ Transaction model indexes ensured successfully');
-  } catch (error) {
-    console.error('❌ Error ensuring Transaction indexes:', error.message);
-    throw error;
-  }
-};
+
 
 // =================================================================
 //                      VIRTUAL PROPERTIES
