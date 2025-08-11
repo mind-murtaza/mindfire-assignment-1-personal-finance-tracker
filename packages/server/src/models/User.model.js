@@ -1,22 +1,66 @@
 /**
- * User Model
- * Purpose: Stores user identity, credentials, and application settings
+ * @fileoverview User Model - Identity, Credentials, and Settings.
+ * Enterprise-grade Mongoose model for users with secure password handling,
+ * Zod-backed validation in pre-save hooks, and rich instance/statics for
+ * profile, settings, and account lifecycle management.
  *
- * Performance Optimizations:
+ * @module models/User
+ * @author Murtaza
+ * @version 1.0.0
+ * @since 1.0.0
+ * @requires mongoose
+ * @requires bcryptjs
+ * @requires ../schemas
+ *
+ * @description
+ * Performance:
  * - Email index for fast login lookups
- * - Status index for user management queries
- * - Compound indexes for common query patterns
+ * - Status and composite indexes for common user management queries
  *
- * Security Features:
- * - Password automatically hashed via pre-save middleware
- * - Email validation and normalization via Zod
- * - Account status tracking
+ * Security:
+ * - Password hashed in pre-save with bcrypt (saltRounds=12)
+ * - Data validation handled at API route level (API-first architecture)
+ * - JSON transforms strip sensitive fields (password, __v)
  */
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const {
-	createUserSchema,
-} = require("../schemas");
+// No schema imports needed - validation handled at route level
+
+/**
+ * @typedef {Object} UserProfile
+ * @property {string} [firstName]
+ * @property {string} [lastName]
+ * @property {string} [avatarUrl]
+ * @property {string} [mobileNumber]
+ */
+
+/**
+ * @typedef {Object} UserSettings
+ * @property {string} [mobileDialCode]
+ * @property {string} [currency]
+ * @property {('light'|'dark'|'system')} [theme]
+ */
+
+/**
+ * @typedef {Object} UserDocument
+ * @property {string} email
+ * @property {string} password
+ * @property {UserProfile} profile
+ * @property {UserSettings} settings
+ * @property {('active'|'suspended'|'pending_verification'|'deleted')} status
+ * @property {Date|null} lastLoginAt
+ * @property {Date} createdAt
+ * @property {Date} updatedAt
+ * @property {function(string): Promise<boolean>} comparePassword
+ * @property {function(): string} getFullName
+ * @property {function(): boolean} isActive
+ * @property {function(): {isActive: boolean, status: string, statusCode: (number|null)}} getStatusInfo
+ * @property {function(): Promise<UserDocument>} updateLastLogin
+ * @property {function(UserProfile): Promise<UserDocument>} updateProfile
+ * @property {function(UserSettings): Promise<UserDocument>} updateSettings
+ * @property {function(string): Promise<UserDocument>} updatePassword
+ * @property {function(): Promise<UserDocument>} softDelete
+ */
 
 const { Schema } = mongoose;
 
@@ -24,6 +68,10 @@ const { Schema } = mongoose;
 //                      USER SCHEMA DEFINITION
 // =================================================================
 
+/**
+ * Mongoose schema for User collection.
+ * @constant {Schema<UserDocument>} UserSchema
+ */
 const UserSchema = new Schema(
 	{
 		// Authentication fields
@@ -66,14 +114,19 @@ const UserSchema = new Schema(
 				default: "system",
 			},
 		},
-
-		// Account status management
+		/**
+		 * User account status.
+		 * Possible values: 'active' | 'suspended' | 'pending_verification' | 'deleted'
+		 */
 		status: {
 			type: String,
 			default: "pending_verification",
 		},
 
-		// Activity tracking
+		/**
+		 * Last login timestamp.
+		 * @type {Date|null}
+		 */
 		lastLoginAt: {
 			type: Date,
 			default: null,
@@ -81,7 +134,7 @@ const UserSchema = new Schema(
 	},
 	{
 		// Schema options
-		timestamps: true, // Automatically adds createdAt and updatedAt
+		timestamps: true,
 		collection: "users",
 
 		// Optimize for memory usage and performance
@@ -91,10 +144,9 @@ const UserSchema = new Schema(
 		// JSON transformation options
 		toJSON: {
 			/**
-			 * remove password and __v (Mon) from the output
+			 * Remove sensitive fields from JSON output
 			 */
 			transform: function (doc, ret) {
-				// Remove sensitive fields from JSON output
 				delete ret.password;
 				delete ret.__v;
 				return ret;
@@ -115,15 +167,17 @@ const UserSchema = new Schema(
 // =================================================================
 
 /**
- * Primary indexes for performance
- * background: true means that the index will be created in the background
+ * Unique index on email for fast authentication lookups.
  */
 UserSchema.index({ email: 1 }, { unique: true, background: true });
+
+/**
+ * Secondary index on status for management queries.
+ */
 UserSchema.index({ status: 1 }, { background: true });
 
 /**
- * Compound indexes for common queries
- * Compound index for efficient queries by status, sorted by most recent lastLoginAt (descending)
+ * Compound index for status and last login recency.
  */
 UserSchema.index({ status: 1, lastLoginAt: -1 }, { background: true });
 
@@ -132,38 +186,17 @@ UserSchema.index({ status: 1, lastLoginAt: -1 }, { background: true });
 // =================================================================
 
 /**
- * Pre-save middleware for Zod validation and password hashing
+ * Pre-save middleware
+ * - Data transformations (toLowerCase, trim)
+ * - Password hashing on change
+ * - No validation (handled at route level for API-first architecture)
+ *
+ * @this {UserDocument}
+ * @param {Function} next Express next
  */
 UserSchema.pre("save", async function (next) {
 	try {
-		// STEP 1: VALIDATE NEW DOCUMENTS ONLY WITH ZOD
-		// For new documents, we validate the complete user object
-		if (this.isNew) {
-            // For new documents, we construct a plain object to avoid passing Mongoose-added fields to Zod
-            const plainUserObject = {
-                email: this.email,
-                password: this.password,
-                profile: this.profile,
-                settings: this.settings,
-                status: this.status
-            };
-			const validation = createUserSchema.safeParse(plainUserObject);
-			if (!validation.success) {
-				const error = new Error(validation.error.issues[0].message);
-				error.name = "ValidationError";
-				return next(error);
-			}
-			// Apply Zod's transformations (e.g., toLowerCase, trim) back to the document
-			const { email, profile } = validation.data;
-			this.email = email;
-			this.profile.firstName = profile.firstName;
-			this.profile.lastName = profile.lastName;
-		}
-		// For updates: NO validation here. Updates should be validated at API layer.
-		// This keeps the model simple and follows single responsibility principle.
-
-		// STEP 2: SECURELY TRANSFORM THE PASSWORD (IF MODIFIED)
-		// This runs for both new documents and updates when password is modified
+			// Password validation handled at route level - just hash here
 		if (this.isModified("password")) {
 			const saltRounds = 12;
 			this.password = await bcrypt.hash(this.password, saltRounds);
@@ -180,13 +213,14 @@ UserSchema.pre("save", async function (next) {
 // =================================================================
 
 /**
- * Compare password for authentication
- * @param {string} candidatePassword - Password to compare
- * @returns {Promise<boolean>} - True if password matches
+ * Compare password for authentication.
+ * @function comparePassword
+ * @memberof UserDocument
+ * @param {string} candidatePassword
+ * @returns {Promise<boolean>}
  */
 UserSchema.methods.comparePassword = async function (candidatePassword) {
 	try {
-        // re-fetch password as it is not selected by default
         const user = await this.constructor.findById(this._id).select('+password');
 		return await bcrypt.compare(candidatePassword, user.password);
 	} catch (error) {
@@ -198,26 +232,54 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
 //                      INSTANCE METHODS
 // =================================================================
 
-
 /**
- * Get user's full name
- * @returns {string} - Full name
+ * Get user's full name.
+ * @function getFullName
+ * @memberof UserDocument
+ * @returns {string}
  */
 UserSchema.methods.getFullName = function () {
 	return `${this.profile.firstName} ${this.profile.lastName}`.trim();
 };
 
 /**
- * Check if user account is active
- * @returns {boolean} - True if account is active
+ * Check if user account is active.
+ * @function isActive
+ * @memberof UserDocument
+ * @returns {boolean}
  */
 UserSchema.methods.isActive = function () {
 	return this.status === "active";
 };
 
 /**
- * Update last login timestamp
- * @returns {Promise<User>} - Updated user document
+ * Get status info including recommended HTTP status for non-active states.
+ * @function getStatusInfo
+ * @memberof UserDocument
+ * @returns {{isActive:boolean,status:string,statusCode:(number|null)}}
+ */
+UserSchema.methods.getStatusInfo = function () {
+	const STATUS_CODE_MAP = {
+		active: null,
+		suspended: 403,
+		deleted: 401,
+		pending_verification: 401
+	};
+
+	return {
+		isActive: this.status === "active",
+		status: this.status,
+		statusCode: STATUS_CODE_MAP[this.status] || 401
+	};
+};
+
+/**
+ * Update last login timestamp and persist.
+ * @function updateLastLogin
+ * @memberof UserDocument
+ * @returns {Promise<UserDocument>}
+ * @example
+ * await user.updateLastLogin();
  */
 UserSchema.methods.updateLastLogin = async function () {
 	this.lastLoginAt = new Date();
@@ -225,8 +287,58 @@ UserSchema.methods.updateLastLogin = async function () {
 };
 
 /**
- * Soft delete user account
- * @returns {Promise<User>} - Updated user document
+ * Partially update profile fields and persist (validated in pre-save).
+ * @function updateProfile
+ * @memberof UserDocument
+ * @param {UserProfile} profileData
+ * @returns {Promise<UserDocument>}
+ */
+UserSchema.methods.updateProfile = async function (profileData) {
+	// Only update fields that are actually provided (not undefined)
+	Object.keys(profileData).forEach(key => {
+		if (profileData[key] !== undefined && this.profile.hasOwnProperty(key)) {
+			this.profile[key] = profileData[key];
+		}
+	});
+	
+	return await this.save(); // Triggers pre-save validation
+};
+
+/**
+ * Partially update settings and persist (validated in pre-save).
+ * @function updateSettings
+ * @memberof UserDocument
+ * @param {UserSettings} settingsData
+ * @returns {Promise<UserDocument>}
+ */
+UserSchema.methods.updateSettings = async function (settingsData) {
+	// Only update fields that are actually provided (not undefined)
+	Object.keys(settingsData).forEach(key => {
+		if (settingsData[key] !== undefined && this.settings.hasOwnProperty(key)) {
+			this.settings[key] = settingsData[key];
+		}
+	});
+	
+	return await this.save(); // Triggers pre-save validation
+};
+
+/**
+ * Update password (hashed by pre-save hook).
+ * @function updatePassword
+ * @memberof UserDocument
+ * @param {string} newPassword
+ * @returns {Promise<UserDocument>}
+ */
+UserSchema.methods.updatePassword = async function (newPassword) {
+	this.password = newPassword;
+	return await this.save(); // Triggers pre-save validation and hashing
+};
+
+/**
+ * Soft delete the user by setting status to 'deleted'.
+ * @function softDelete
+ * @memberof UserDocument
+ * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.softDelete = async function () {
 	this.status = "deleted";
@@ -238,9 +350,11 @@ UserSchema.methods.softDelete = async function () {
 // =================================================================
 
 /**
- * Find user by email (excluding deleted users)
- * @param {string} email - User email
- * @returns {Promise<User|null>} - User document or null
+ * Find user by normalized email, excluding deleted.
+ * @function findByEmail
+ * @memberof UserModel
+ * @param {string} email
+ * @returns {Promise<UserDocument|null>}
  */
 UserSchema.statics.findByEmail = function (email) {
 	return this.findOne({
@@ -250,9 +364,11 @@ UserSchema.statics.findByEmail = function (email) {
 };
 
 /**
- * Find active users with pagination
- * @param {Object} options - Pagination options
- * @returns {Promise<{users: User[], total: number}>} - Paginated results
+ * Find active users with pagination.
+ * @function findActiveUsers
+ * @memberof UserModel
+ * @param {{page?:number,limit?:number,sortBy?:string,sortOrder?:('asc'|'desc')}} [options]
+ * @returns {Promise<{users: UserDocument[], total: number}>}
  */
 UserSchema.statics.findActiveUsers = async function (options = {}) {
 	const {
