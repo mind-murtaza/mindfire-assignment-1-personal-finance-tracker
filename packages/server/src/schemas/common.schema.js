@@ -58,6 +58,27 @@ const nameSchema = z
 	.regex(/^[a-zA-Z]+$/, "Name can only contain letters")
 	.trim();
 
+// Safer http(s) URL validator: allows standard domains/paths, blocks XSS vectors and whitespace
+const strictHttpUrlSchema = z.string().refine((value) => {
+	const s = String(value);
+	if (!s || /\s/.test(s)) return false; // no whitespace
+	// Block HTML/script/protocol XSS vectors
+	const badPatterns = [
+		/<\s*\/?\s*script\b/i, // script tags
+		/<[^>]+>/, // any HTML tag
+		/&lt;.*?&gt;/i, // encoded tags
+		/\bjavascript:/i,
+		/\bdata:/i,
+	];
+	if (badPatterns.some((re) => re.test(s))) return false;
+	try {
+		const u = new URL(s);
+		return u.protocol === "http:" || u.protocol === "https:";
+	} catch {
+		return false;
+	}
+}, "Invalid or unsafe URL");
+
 /**
  * Currency code validation - ISO 4217 standard
  */
@@ -116,7 +137,10 @@ const dateRangeSchema = z
  */
 const jwtTokenSchema = z
 	.string()
-	.regex(/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/, "Invalid JWT token format")
+	.regex(
+		/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/,
+		"Invalid JWT token format"
+	)
 	.describe("JWT authentication token");
 
 /**
@@ -138,27 +162,33 @@ const tokenExpirationSchema = z
 /**
  * Email Verification Token Schema
  */
-const emailVerificationTokenSchema = z.object({
-	token: jwtTokenSchema,
-	expires: tokenExpirationSchema,
-}).strict();
+const emailVerificationTokenSchema = z
+	.object({
+		token: jwtTokenSchema,
+		expires: tokenExpirationSchema,
+	})
+	.strict();
 
 /**
  * Password Reset Token Schema
  */
-const passwordResetTokenSchema = z.object({
-	token: jwtTokenSchema,
-	expires: tokenExpirationSchema,
-}).strict();
+const passwordResetTokenSchema = z
+	.object({
+		token: jwtTokenSchema,
+		expires: tokenExpirationSchema,
+	})
+	.strict();
 
 /**
  * OTP Login Schema
  */
-const otpLoginSchema = z.object({
-	code: otpCodeSchema,
-	expires: tokenExpirationSchema,
-	attempts: z.number().int().min(0).max(5).default(0),
-}).strict();
+const otpLoginSchema = z
+	.object({
+		code: otpCodeSchema,
+		expires: tokenExpirationSchema,
+		attempts: z.number().int().min(0).max(5).default(0),
+	})
+	.strict();
 
 // =================================================================
 // ROUTE REQUEST SCHEMAS (for API endpoints)
@@ -167,39 +197,49 @@ const otpLoginSchema = z.object({
 /**
  * Email verification request schema
  */
-const verifyEmailRequestSchema = z.object({
-	token: jwtTokenSchema,
-}).strict();
+const verifyEmailRequestSchema = z
+	.object({
+		token: jwtTokenSchema,
+	})
+	.strict();
 
 /**
  * Password reset request schema
  */
-const forgotPasswordRequestSchema = z.object({
-	email: emailSchema,
-}).strict();
+const forgotPasswordRequestSchema = z
+	.object({
+		email: emailSchema,
+	})
+	.strict();
 
 /**
  * Password reset confirmation schema
  */
-const resetPasswordRequestSchema = z.object({
-	token: jwtTokenSchema,
-	newPassword: passwordSchema,
-}).strict();
+const resetPasswordRequestSchema = z
+	.object({
+		token: jwtTokenSchema,
+		newPassword: passwordSchema,
+	})
+	.strict();
 
 /**
  * OTP request schema (passwordless login)
  */
-const requestOtpSchema = z.object({
-	email: emailSchema,
-}).strict();
+const requestOtpSchema = z
+	.object({
+		email: emailSchema,
+	})
+	.strict();
 
 /**
  * OTP verification schema (passwordless login)
  */
-const verifyOtpSchema = z.object({
-	email: emailSchema,
-	code: otpCodeSchema,
-}).strict();
+const verifyOtpSchema = z
+	.object({
+		email: emailSchema,
+		code: otpCodeSchema,
+	})
+	.strict();
 
 module.exports = {
 	// Core schemas
@@ -213,6 +253,7 @@ module.exports = {
 	categoryTypeSchema,
 	paginationSchema,
 	dateRangeSchema,
+	strictHttpUrlSchema,
 	// Authentication component schemas
 	jwtTokenSchema,
 	otpCodeSchema,

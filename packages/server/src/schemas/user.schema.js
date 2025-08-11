@@ -7,6 +7,7 @@ const {
 	emailVerificationTokenSchema,
 	passwordResetTokenSchema,
 	otpLoginSchema,
+	strictHttpUrlSchema,
 } = require("./common.schema");
 const { DIAL_CODES } = require("../utils/constants/countries-dial-codes");
 
@@ -14,8 +15,7 @@ const userProfileSchema = z
 	.object({
 		firstName: nameSchema,
 		lastName: nameSchema,
-		avatarUrl: z
-			.string()
+		avatarUrl: strictHttpUrlSchema
 			.max(500, "Avatar URL cannot exceed 500 characters")
 			.optional()
 			.nullable(),
@@ -92,7 +92,7 @@ const updateUserSchema = z
  */
 const loginSchema = z.object({
 	email: emailSchema,
-	password: z.string().min(1, "Password is required"), // No complexity rules for login
+	password: passwordSchema, // No complexity rules for login
 }).strict();
 
 module.exports = {

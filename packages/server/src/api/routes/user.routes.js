@@ -7,14 +7,18 @@ const { userProfileSchema, userSettingsSchema } = require('../../schemas/user.sc
 const { passwordSchema } = require('../../schemas/common.schema');
 
 // Use existing schemas from user.schema.js (DRY principle)
-const profileUpdateSchema = userProfileSchema.partial(); // Allow partial updates
+const profileUpdateSchema = userProfileSchema.partial().refine((data) => {
+  return Object.keys(data).length > 0;
+}, "At least one field is required"); // Allow partial updates
 
 // Use existing schemas from user.schema.js (DRY principle) 
-const settingsUpdateSchema = userSettingsSchema.partial(); // Allow partial updates
+const settingsUpdateSchema = userSettingsSchema.partial().refine((data) => {
+  return Object.keys(data).length > 0;
+}, "At least one field is required"); // Allow partial updates
 
 // Password change schema using existing passwordSchema from common.schema.js
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
+  currentPassword: passwordSchema,
   newPassword: passwordSchema,
 }).strict();
 
