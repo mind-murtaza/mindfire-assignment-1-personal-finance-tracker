@@ -73,7 +73,8 @@ router.get('/', (req, res) => {
           base: '/api/v1/auth',
           routes: {
             'POST /register': 'User registration',
-            'POST /login': 'User authentication'
+            'POST /login': 'User authentication',
+            'POST /refresh': 'Token refresh (requires valid token)'
           }
         },
         users: {

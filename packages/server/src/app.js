@@ -17,7 +17,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const apiRoutes = require('./api/routes');
-const errorHandler = require('./api/middlewares/errorHandler');
+const { errorHandler } = require('./api/middlewares/errorHandler');
 
 /**
  * Express application instance configured for API-only communication
