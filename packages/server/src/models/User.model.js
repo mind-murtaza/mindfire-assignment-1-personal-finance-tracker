@@ -24,7 +24,6 @@
  */
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-// No schema imports needed - validation handled at route level
 
 /**
  * @typedef {Object} UserProfile
@@ -42,13 +41,29 @@ const bcrypt = require("bcryptjs");
  */
 
 /**
+ * @typedef {Object} UserAuthSystems
+ * @property {Object} emailVerification - Email verification system
+ * @property {string|null} emailVerification.token - JWT token for email verification
+ * @property {Date|null} emailVerification.expires - Token expiration time
+ * @property {Object} passwordReset - Password reset system
+ * @property {string|null} passwordReset.token - JWT token for password reset
+ * @property {Date|null} passwordReset.expires - Token expiration time
+ * @property {Object} otp - OTP login system (passwordless)
+ * @property {string|null} otp.code - 6-digit OTP code
+ * @property {Date|null} otp.expires - OTP expiration time
+ * @property {number} otp.attempts - Failed OTP attempts count (0-5)
+ */
+
+/**
  * @typedef {Object} UserDocument
  * @property {string} email
  * @property {string} password
  * @property {UserProfile} profile
  * @property {UserSettings} settings
  * @property {('active'|'suspended'|'pending_verification'|'deleted')} status
+ * @property {boolean} emailVerified
  * @property {Date|null} lastLoginAt
+ * @property {UserAuthSystems} auth
  * @property {Date} createdAt
  * @property {Date} updatedAt
  * @property {function(string): Promise<boolean>} comparePassword
@@ -124,12 +139,77 @@ const UserSchema = new Schema(
 		},
 
 		/**
+		 * Email verification status.
+		 * @type {Boolean}
+		 */
+		emailVerified: {
+			type: Boolean,
+			select: false,
+			default: false,
+		},
+
+		/**
 		 * Last login timestamp.
 		 * @type {Date|null}
 		 */
 		lastLoginAt: {
 			type: Date,
+			select: false,
 			default: null,
+		},
+
+		/**
+		 * Authentication systems for email verification, password reset, and OTP login.
+		 * All tokens and codes are sensitive and not selected by default.
+		 */
+		auth: {
+			// Email Verification System
+			emailVerification: {
+				token: {
+					type: String,
+					select: false, // Sensitive: JWT token
+					default: null,
+				},
+				expires: {
+					type: Date,
+					select: false, // Sensitive: Expiration time
+					default: null,
+				},
+			},
+
+			// Password Reset System
+			passwordReset: {
+				token: {
+					type: String,
+					select: false, // Sensitive: JWT token
+					default: null,
+				},
+				expires: {
+					type: Date,
+					select: false, // Sensitive: Expiration time
+					default: null,
+				},
+			},
+
+			// OTP Login System (Passwordless Authentication)
+			otp: {
+				code: {
+					type: String,
+					select: false, // Sensitive: 6-digit OTP code
+					default: null,
+				},
+				expires: {
+					type: Date,
+					select: false, // Sensitive: Expiration time
+					default: null,
+				},
+				attempts: {
+					type: Number,
+					default: 0,
+					min: 0,
+					max: 5,
+				},
+			},
 		},
 	},
 	{
@@ -282,8 +362,12 @@ UserSchema.methods.getStatusInfo = function () {
  * await user.updateLastLogin();
  */
 UserSchema.methods.updateLastLogin = async function () {
-	this.lastLoginAt = new Date();
-	return await this.save();
+	try {
+		this.lastLoginAt = new Date();
+		return await this.save();
+	} catch (error) {
+		throw new Error(`Last login update failed: ${error.message}`);
+	}
 };
 
 /**
@@ -294,14 +378,18 @@ UserSchema.methods.updateLastLogin = async function () {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.updateProfile = async function (profileData) {
-	// Only update fields that are actually provided (not undefined)
-	Object.keys(profileData).forEach(key => {
-		if (profileData[key] !== undefined && this.profile.hasOwnProperty(key)) {
-			this.profile[key] = profileData[key];
-		}
-	});
-	
-	return await this.save(); // Triggers pre-save validation
+	try {
+		// Only update fields that are actually provided (not undefined)
+		Object.keys(profileData).forEach(key => {
+			if (profileData[key] !== undefined && this.profile.hasOwnProperty(key)) {
+				this.profile[key] = profileData[key];
+			}
+		});
+		
+		return await this.save(); // Triggers pre-save validation
+	} catch (error) {
+		throw new Error(`Profile update failed: ${error.message}`);
+	}
 };
 
 /**
@@ -312,14 +400,18 @@ UserSchema.methods.updateProfile = async function (profileData) {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.updateSettings = async function (settingsData) {
-	// Only update fields that are actually provided (not undefined)
-	Object.keys(settingsData).forEach(key => {
-		if (settingsData[key] !== undefined && this.settings.hasOwnProperty(key)) {
-			this.settings[key] = settingsData[key];
-		}
-	});
-	
-	return await this.save(); // Triggers pre-save validation
+	try {
+		// Only update fields that are actually provided (not undefined)
+		Object.keys(settingsData).forEach(key => {
+			if (settingsData[key] !== undefined && this.settings.hasOwnProperty(key)) {
+				this.settings[key] = settingsData[key];
+			}
+		});
+		
+		return await this.save(); // Triggers pre-save validation
+	} catch (error) {
+		throw new Error(`Settings update failed: ${error.message}`);
+	}
 };
 
 /**
@@ -330,8 +422,12 @@ UserSchema.methods.updateSettings = async function (settingsData) {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.updatePassword = async function (newPassword) {
-	this.password = newPassword;
-	return await this.save(); // Triggers pre-save validation and hashing
+	try {
+		this.password = newPassword;
+		return await this.save(); // Triggers pre-save validation and hashing
+	} catch (error) {
+		throw new Error(`Password update failed: ${error.message}`);
+	}
 };
 
 /**
@@ -341,8 +437,28 @@ UserSchema.methods.updatePassword = async function (newPassword) {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.softDelete = async function () {
-	this.status = "deleted";
-	return await this.save();
+	try {
+		this.status = "deleted";
+		return await this.save();
+	} catch (error) {
+		throw new Error(`Soft delete failed: ${error.message}`);
+	}
+};
+
+/**
+ * Update user status.
+ * @function updateStatus
+ * @memberof UserDocument
+ * @param {string} status
+ * @returns {Promise<UserDocument>}
+ */
+UserSchema.methods.updateStatus = async function (status) {
+	try {
+		this.status = status;
+		return await this.save();
+	} catch (error) {
+		throw new Error(`Status update failed: ${error.message}`);
+	}
 };
 
 // =================================================================
@@ -371,24 +487,28 @@ UserSchema.statics.findByEmail = function (email) {
  * @returns {Promise<{users: UserDocument[], total: number}>}
  */
 UserSchema.statics.findActiveUsers = async function (options = {}) {
-	const {
-		page = 1,
-		limit = 20,
-		sortBy = "createdAt",
-		sortOrder = "desc",
-	} = options;
-	const skip = (page - 1) * limit;
+	try {
+		const {
+			page = 1,
+			limit = 20,
+			sortBy = "createdAt",
+			sortOrder = "desc",
+		} = options;
+		const skip = (page - 1) * limit;
 
-	const [users, total] = await Promise.all([
-		this.find({ status: "active" })
-			.sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
-			.skip(skip)
-			.limit(limit)
-			.lean(),
-		this.countDocuments({ status: "active" }),
-	]);
+		const [users, total] = await Promise.all([
+			this.find({ status: "active" })
+				.sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
+				.skip(skip)
+				.limit(limit)
+				.lean(),
+			this.countDocuments({ status: "active" }),
+		]);
 
-	return { users, total };
+		return { users, total };
+	} catch (error) {
+		throw new Error(`Find active users failed: ${error.message}`);
+	}
 };
 
 

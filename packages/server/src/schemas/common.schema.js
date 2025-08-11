@@ -1,6 +1,6 @@
 const { z } = require("zod");
 const { ObjectId } = require("mongodb");
-const { CURRENCY_CODES } = require("../constants/currencies");
+const { CURRENCY_CODES } = require("../utils/constants/currencies");
 
 /**
  * ObjectId validation - MongoDB ObjectId format
@@ -111,7 +111,98 @@ const dateRangeSchema = z
 		path: ["endDate"],
 	});
 
+/**
+ * JWT Token Schema - For authentication tokens
+ */
+const jwtTokenSchema = z
+	.string()
+	.regex(/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/, "Invalid JWT token format")
+	.describe("JWT authentication token");
+
+/**
+ * OTP Code Schema - 6-digit numeric code
+ */
+const otpCodeSchema = z
+	.string()
+	.regex(/^\d{6}$/, "OTP code must be exactly 6 digits")
+	.describe("6-digit OTP code");
+
+/**
+ * Token Expiration Schema - Future date validation
+ */
+const tokenExpirationSchema = z
+	.date()
+	.refine((date) => date > new Date(), "Token expiration must be in the future")
+	.describe("Token expiration timestamp");
+
+/**
+ * Email Verification Token Schema
+ */
+const emailVerificationTokenSchema = z.object({
+	token: jwtTokenSchema,
+	expires: tokenExpirationSchema,
+}).strict();
+
+/**
+ * Password Reset Token Schema
+ */
+const passwordResetTokenSchema = z.object({
+	token: jwtTokenSchema,
+	expires: tokenExpirationSchema,
+}).strict();
+
+/**
+ * OTP Login Schema
+ */
+const otpLoginSchema = z.object({
+	code: otpCodeSchema,
+	expires: tokenExpirationSchema,
+	attempts: z.number().int().min(0).max(5).default(0),
+}).strict();
+
+// =================================================================
+// ROUTE REQUEST SCHEMAS (for API endpoints)
+// =================================================================
+
+/**
+ * Email verification request schema
+ */
+const verifyEmailRequestSchema = z.object({
+	token: jwtTokenSchema,
+}).strict();
+
+/**
+ * Password reset request schema
+ */
+const forgotPasswordRequestSchema = z.object({
+	email: emailSchema,
+}).strict();
+
+/**
+ * Password reset confirmation schema
+ */
+const resetPasswordRequestSchema = z.object({
+	token: jwtTokenSchema,
+	newPassword: passwordSchema,
+}).strict();
+
+/**
+ * OTP request schema (passwordless login)
+ */
+const requestOtpSchema = z.object({
+	email: emailSchema,
+}).strict();
+
+/**
+ * OTP verification schema (passwordless login)
+ */
+const verifyOtpSchema = z.object({
+	email: emailSchema,
+	code: otpCodeSchema,
+}).strict();
+
 module.exports = {
+	// Core schemas
 	objectIdSchema,
 	currencyAmountSchema,
 	emailSchema,
@@ -122,4 +213,17 @@ module.exports = {
 	categoryTypeSchema,
 	paginationSchema,
 	dateRangeSchema,
+	// Authentication component schemas
+	jwtTokenSchema,
+	otpCodeSchema,
+	tokenExpirationSchema,
+	emailVerificationTokenSchema,
+	passwordResetTokenSchema,
+	otpLoginSchema,
+	// Route request schemas
+	verifyEmailRequestSchema,
+	forgotPasswordRequestSchema,
+	resetPasswordRequestSchema,
+	requestOtpSchema,
+	verifyOtpSchema,
 };

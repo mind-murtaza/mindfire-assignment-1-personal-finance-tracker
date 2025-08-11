@@ -32,11 +32,7 @@ const authService = require("../services/auth.service");
 const register = async (req, res, next) => {
 	try {
 		const result = await authService.register(req.body);
-		res.status(201).json({
-			success: true,
-			data: result,
-			message: "Registration successful",
-		});
+		res.status(result.statusCode || 201).json(result);
 	} catch (err) {
 		next(err);
 	}
@@ -98,11 +94,156 @@ const refresh = async (req, res, next) => {
 };
 
 // =================================================================
+//                    EMAIL VERIFICATION ENDPOINTS
+// =================================================================
+
+/**
+ * Handle email verification
+ * Verifies user email using JWT token and activates account
+ *
+ * @async
+ * @function verifyEmail
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Verification data (validated by middleware)
+ * @param {string} req.body.token - JWT verification token
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Promise<void>} HTTP response with verification result
+ * @since 1.0.0
+ */
+const verifyEmail = async (req, res, next) => {
+	try {
+		const result = await authService.verifyEmail(req.body.token);
+		res.status(result.statusCode || 200).json(result);
+	} catch (err) {
+		next(err);
+	}
+};
+
+// =================================================================
+//                    PASSWORD RESET ENDPOINTS
+// =================================================================
+
+/**
+ * Handle forgot password request
+ * Initiates password reset process by sending reset email
+ *
+ * @async
+ * @function forgotPassword
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Forgot password data (validated by middleware)
+ * @param {string} req.body.email - User email address
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Promise<void>} HTTP response with operation result
+ * @since 1.0.0
+ */
+const forgotPassword = async (req, res, next) => {
+	try {
+		const result = await authService.forgotPassword(req.body.email);
+		res.status(result.statusCode || 200).json(result);
+	} catch (err) {
+		next(err);
+	}
+};
+
+/**
+ * Handle password reset
+ * Resets user password using JWT token
+ *
+ * @async
+ * @function resetPassword
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Reset password data (validated by middleware)
+ * @param {string} req.body.token - JWT reset token
+ * @param {string} req.body.newPassword - New password
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Promise<void>} HTTP response with reset result
+ * @since 1.0.0
+ */
+const resetPassword = async (req, res, next) => {
+	try {
+		const result = await authService.resetPassword(req.body.token, req.body.newPassword);
+		res.status(result.statusCode || 200).json(result);
+	} catch (err) {
+		next(err);
+	}
+};
+
+// =================================================================
+//                    OTP AUTHENTICATION ENDPOINTS
+// =================================================================
+
+/**
+ * Handle OTP request for passwordless login
+ * Generates and sends OTP code via email
+ *
+ * @async
+ * @function requestOtp
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - OTP request data (validated by middleware)
+ * @param {string} req.body.email - User email address
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Promise<void>} HTTP response with OTP request result
+ * @since 1.0.0
+ */
+const requestOtp = async (req, res, next) => {
+	try {
+		const result = await authService.requestOtp(req.body.email);
+		res.status(result.statusCode || 200).json(result);
+	} catch (err) {
+		next(err);
+	}
+};
+
+/**
+ * Handle OTP verification and login
+ * Verifies OTP code and authenticates user
+ *
+ * @async
+ * @function verifyOtp
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - OTP verification data (validated by middleware)
+ * @param {string} req.body.email - User email address
+ * @param {string} req.body.code - 6-digit OTP code
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Promise<void>} HTTP response with authentication result
+ * @since 1.0.0
+ */
+const verifyOtp = async (req, res, next) => {
+	try {
+		const result = await authService.verifyOtp(req.body.email, req.body.code);
+		res.json({
+			success: true,
+			data: result,
+			message: "OTP verified successfully",
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+// =================================================================
 //                    MODULE EXPORTS
 // =================================================================
 
 module.exports = {
+	// Core authentication
 	register,
 	login,
 	refresh,
+	
+	// Email verification
+	verifyEmail,
+	
+	// Password reset
+	forgotPassword,
+	resetPassword,
+	
+	// OTP authentication
+	requestOtp,
+	verifyOtp,
 };

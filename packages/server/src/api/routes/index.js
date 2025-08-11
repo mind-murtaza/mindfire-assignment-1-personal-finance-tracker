@@ -11,7 +11,8 @@
  */
 
 const express = require('express');
-
+require('dotenv').config();
+const appName = process.env.APP_NAME || "Personal Finance Tracker";
 // Import individual route modules
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
@@ -31,7 +32,7 @@ const router = express.Router();
  */
 router.use((req, res, next) => {
   res.set('X-API-Version', '1.0.0');
-  res.set('X-Service', 'Personal-Finance-Tracker');
+  res.set('X-Service', appName);
   next();
 });
 
@@ -65,16 +66,21 @@ router.use('/users', userRoutes);
 router.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Personal Finance Tracker API v1.0.0',
+    message: `${appName} API v1.0.0`,
     version: '1.0.0',
     documentation: {
       endpoints: {
         auth: {
           base: '/api/v1/auth',
           routes: {
-            'POST /register': 'User registration',
-            'POST /login': 'User authentication',
-            'POST /refresh': 'Token refresh (requires valid token)'
+            'POST /register': 'User registration with email verification',
+            'POST /login': 'User authentication with email/password',
+            'POST /refresh': 'Token refresh (requires valid token)',
+            'POST /forgot-password': 'Request password reset email',
+            'POST /reset-password': 'Reset password using token',
+            'POST /verify-email': 'Verify email address using token',
+            'POST /request-otp': 'Request OTP for passwordless login',
+            'POST /verify-otp': 'Verify OTP and authenticate user'
           }
         },
         users: {
@@ -88,8 +94,25 @@ router.get('/', (req, res) => {
           }
         }
       },
-      authentication: 'Bearer JWT token required for protected routes',
-      contentType: 'application/json'
+      authentication: {
+        type: 'Bearer JWT token required for protected routes',
+        flows: [
+          'Email/Password login',
+          'OTP (passwordless) login',
+          'Email verification required for new accounts',
+          'Password reset via email token'
+        ]
+      },
+      contentType: 'application/json',
+      features: [
+        'JWT-based authentication',
+        'Email verification system',
+        'Password reset functionality', 
+        'OTP (passwordless) authentication',
+        'Comprehensive input validation',
+        'Background email processing'
+      ],
+      status: 'Production Ready'
     }
   });
 });

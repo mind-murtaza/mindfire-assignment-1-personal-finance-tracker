@@ -4,8 +4,11 @@ const {
 	passwordSchema,
 	currencyCodeSchema,
 	nameSchema,
+	emailVerificationTokenSchema,
+	passwordResetTokenSchema,
+	otpLoginSchema,
 } = require("./common.schema");
-const { DIAL_CODES } = require("../constants/countries-dial-codes");
+const { DIAL_CODES } = require("../utils/constants/countries-dial-codes");
 
 const userProfileSchema = z
 	.object({
@@ -47,6 +50,16 @@ const userStatusSchema = z
 	})
 	.default("pending_verification");
 
+// Authentication system schema - reuse from common.schema.js (DRY principle)
+const authSystemsSchema = z
+	.object({
+		emailVerification: emailVerificationTokenSchema.partial().optional(),
+		passwordReset: passwordResetTokenSchema.partial().optional(),
+		otp: otpLoginSchema.partial().optional(),
+	})
+	.strict()
+	.optional();
+
 const createUserSchema = z
 	.object({
 		email: emailSchema,
@@ -54,6 +67,8 @@ const createUserSchema = z
 		profile: userProfileSchema,
 		settings: userSettingsSchema.optional(),
 		status: userStatusSchema.optional(),
+		emailVerified: z.boolean().default(false).optional(),
+		auth: authSystemsSchema,
 	})
 	.strict();
 
@@ -62,14 +77,31 @@ const updateUserSchema = z
 		profile: userProfileSchema.partial().optional(),
 		settings: userSettingsSchema.partial().optional(),
 		status: userStatusSchema.optional(),
+		emailVerified: z.boolean().optional(),
 		lastLoginAt: z.date().optional(),
+		auth: authSystemsSchema,
 	})
 	.strict();
 
+// =================================================================
+// ROUTE-SPECIFIC SCHEMAS (minimal, reuse common schemas)
+// =================================================================
+
+/**
+ * Login schema (accepts any stored password - no complexity validation)
+ */
+const loginSchema = z.object({
+	email: emailSchema,
+	password: z.string().min(1, "Password is required"), // No complexity rules for login
+}).strict();
+
 module.exports = {
+	// Core user schemas
 	userProfileSchema,
 	userSettingsSchema,
 	userStatusSchema,
 	createUserSchema,
 	updateUserSchema,
+	authSystemsSchema,
+	loginSchema,
 };
