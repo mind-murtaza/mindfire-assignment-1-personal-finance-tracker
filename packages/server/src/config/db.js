@@ -38,7 +38,8 @@ const CONNECTION_CONFIGS = {
     connectTimeoutMS: 10000,
     maxIdleTimeMS: 30000,
     retryWrites: true,
-    retryReads: true
+    retryReads: true,
+    dbName: process.env.MONGO_DB || 'pft_dev'
   },
   test: {
     serverSelectionTimeoutMS: 2000,
@@ -50,7 +51,8 @@ const CONNECTION_CONFIGS = {
     connectTimeoutMS: 5000,
     maxIdleTimeMS: 10000,
     retryWrites: false,
-    retryReads: false
+    retryReads: false,
+    dbName: process.env.MONGO_DB || 'pft_test'
   },
   production: {
     serverSelectionTimeoutMS: 10000,
@@ -64,7 +66,8 @@ const CONNECTION_CONFIGS = {
     retryWrites: true,
     retryReads: true,
     heartbeatFrequencyMS: 10000,
-    serverSelectionRetryDelayMS: 2000
+    serverSelectionRetryDelayMS: 2000,
+    dbName: process.env.MONGO_DB || 'pft_prod'
   }
 };
 
@@ -77,12 +80,7 @@ const getConnectionOptions = () => {
   const config = CONNECTION_CONFIGS[NODE_ENV] || CONNECTION_CONFIGS.development;
   
   return {
-    ...config,
-    // Global options for all environments
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    bufferCommands: false, // Disable mongoose buffering
-    bufferMaxEntries: 0,   // Disable mongoose buffering
+    ...config
   };
 };
 
