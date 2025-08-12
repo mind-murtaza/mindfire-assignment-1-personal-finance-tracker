@@ -18,66 +18,35 @@ const idParamSchema = z.object({ id: objectIdSchema });
 router.use(auth);
 
 router.post(
-  "/",
-  validate(createCategorySchema),
-  (err, req, res, next) => {
-    // Local validation error safety net
-    if (err && err.name === 'ZodError') {
-      return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid category payload' });
-    }
-    return next(err);
-  },
-  categoryController.createCategory
+	"/",
+	validate(createCategorySchema),
+	categoryController.createCategory
 );
 router.get("/", categoryController.getCategories);
 
 router.get("/hierarchy", categoryController.getCategoryHierarchy);
 
 router.get(
-  "/:id",
-  validate(idParamSchema, "params"),
-  (err, req, res, next) => {
-    if (err && err.name === 'ZodError') {
-      return res.status(400).json({ success: false, error: 'Invalid category id' });
-    }
-    return next(err);
-  },
-  categoryController.getCategory
+	"/:id",
+	validate(idParamSchema, "params"),
+	categoryController.getCategory
 );
 router.patch(
-  "/:id",
-  validate(idParamSchema, "params"),
-  validate(updateCategorySchema),
-  (err, req, res, next) => {
-    if (err && err.name === 'ZodError') {
-      return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid update payload' });
-    }
-    return next(err);
-  },
-  categoryController.updateCategory
+	"/:id",
+	validate(idParamSchema, "params"),
+	validate(updateCategorySchema),
+	categoryController.updateCategory
 );
 router.delete(
-  "/:id",
-  validate(idParamSchema, "params"),
-  (err, req, res, next) => {
-    if (err && err.name === 'ZodError') {
-      return res.status(400).json({ success: false, error: 'Invalid category id' });
-    }
-    return next(err);
-  },
-  categoryController.deleteCategory
+	"/:id",
+	validate(idParamSchema, "params"),
+	categoryController.deleteCategory
 );
 
 router.patch(
-  "/:id/set-default",
-  validate(idParamSchema, "params"),
-  (err, req, res, next) => {
-    if (err && err.name === 'ZodError') {
-      return res.status(400).json({ success: false, error: 'Invalid category id' });
-    }
-    return next(err);
-  },
-  categoryController.setDefaultCategory
+	"/:id/set-default",
+	validate(idParamSchema, "params"),
+	categoryController.setDefaultCategory
 );
 
 module.exports = router;

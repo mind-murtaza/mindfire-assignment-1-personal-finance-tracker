@@ -17,6 +17,7 @@ const appName = process.env.APP_NAME || "Personal Finance Tracker";
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
 const categoryRoutes = require("./category.routes");
+const transactionRoutes = require("./transaction.routes");
 
 /**
  * Main router instance for API v1
@@ -61,6 +62,13 @@ router.use('/users', userRoutes);
  * @route /categories/*
  */
 router.use('/categories', categoryRoutes);
+
+/**
+ * Transaction management routes
+ * Handles creating, updating, deleting, listing, and analytics
+ * @route /transactions/*
+ */
+router.use('/transactions', transactionRoutes);
 
 // =================================================================
 //                    API DOCUMENTATION ENDPOINT

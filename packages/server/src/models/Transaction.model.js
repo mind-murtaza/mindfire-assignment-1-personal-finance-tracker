@@ -1,27 +1,34 @@
 /**
- * Transaction Model 
- * Purpose: Core collection storing all individual financial events
- * 
+ * @fileoverview Transaction Model - Persistence and lightweight transformations
+ * Core collection storing all individual financial events.
+ *
  * Performance Optimizations:
- * - Primary index on userId + transactionDate for fast list queries
- * - Compound index on userId + yearMonth for monthly reports
+ * - Primary index on `userId` + `transactionDate` for fast list queries
+ * - Compound index on `userId` + `yearMonth` for monthly reports
  * - Category index for category-based filtering
- * - Denormalized type field for performance
- * 
- * Business Logic:
- * - Automatic year/month/yearMonth calculation for reporting
- * - Decimal128 for precise financial calculations
- * - Soft delete support
- * - Tag-based organization
- * 
- * Validation Strategy:
- * - Field validation: Handled by Zod schemas in pre-save hook
- * - Business logic validation: Handled by Mongoose middleware
- * - Daily transaction limits: Enforced via pre-save middleware
+ * - Denormalized `type` field for performance
+ *
+ * Data Transformations (non-business):
+ * - Automatic `year`/`month`/`yearMonth` calculation for reporting
+ * - Decimal128 amount conversion in JSON/object transforms
+ * - Soft delete timestamp management
+ *
+ * Validation Strategy (API-first):
+ * - All validation is handled at the route/service layer using Zod schemas
+ * - The model only performs non-business data transformations
+ * - No type/business validation is performed in this model
+ *
+ * Error Handling:
+ * - Instance and static methods that perform DB operations use try/catch
+ * - Errors are normalized with `status` and `code` where applicable
+ *
+ * @module models/Transaction
+ * @author Murtaza
+ * @version 1.0.0
+ * @since 1.0.0
  */
 
 const mongoose = require('mongoose');
-const { createTransactionSchema, updateTransactionSchema } = require('../schemas');
 
 const { Schema } = mongoose;
 
@@ -111,8 +118,8 @@ const TransactionSchema = new Schema({
   toJSON: {
     transform: function(doc, ret) {
       // Convert Decimal128 to number for JSON
-      if (ret.amount) {
-        ret.amount = parseFloat(ret.amount.toString());
+      if (ret.amount !== undefined && ret.amount !== null) {
+        ret.amount = parseFloat(String(ret.amount));
       }
       delete ret.__v;
       return ret;
@@ -121,8 +128,8 @@ const TransactionSchema = new Schema({
 
   toObject: {
     transform: function(doc, ret) {
-      if (ret.amount) {
-        ret.amount = parseFloat(ret.amount.toString());
+      if (ret.amount !== undefined && ret.amount !== null) {
+        ret.amount = parseFloat(String(ret.amount));
       }
       delete ret.__v;
       return ret;
@@ -168,172 +175,39 @@ TransactionSchema.index({
  * Pre-save middleware for automatic date field calculation
  */
 TransactionSchema.pre('save', function(next) {
-  if (this.isModified('transactionDate')) {
-    const date = new Date(this.transactionDate);
-    this.year = date.getFullYear();
-    this.month = date.getMonth() + 1; // getMonth() returns 0-11
-    this.yearMonth = `${this.year}-${String(this.month).padStart(2, '0')}`;
-  }
-  
-  next();
-});
-
-/**
- * Pre-save middleware for Zod validation
- * Validates all field-level constraints using Zod schemas
- */
-TransactionSchema.pre('save', function(next) {
   try {
-    // Only validate new documents with Zod to avoid Mongoose-added fields issue
-    if (this.isNew) {
-      // Construct plain object for Zod validation
-      const plainTransactionObject = {
-        userId: this.userId,
-        categoryId: this.categoryId,
-        amount: this.amount ? parseFloat(this.amount.toString()) : undefined,
-        type: this.type,
-        description: this.description,
-        notes: this.notes,
-        transactionDate: this.transactionDate,
-        tags: this.tags
-      };
-
-      const validation = createTransactionSchema.safeParse(plainTransactionObject);
-      
-      if (!validation.success) {
-        const error = new Error(validation.error.issues[0].message);
-        error.name = 'ValidationError';
-        return next(error);
-      }
-
-      // Apply Zod transformations back to document
-      const { description, tags } = validation.data;
-      this.description = description; // Zod trim transformation
-      this.tags = tags;
-    } else {
-      const modifiedFields = {};
-      
-      // Only validate fields that were actually modified
-      if (this.isModified('amount')) {
-        modifiedFields.amount = this.amount ? parseFloat(this.amount.toString()) : undefined;
-      }
-      if (this.isModified('type')) modifiedFields.type = this.type;
-      if (this.isModified('description')) modifiedFields.description = this.description;
-      if (this.isModified('notes')) modifiedFields.notes = this.notes;
-      if (this.isModified('transactionDate')) modifiedFields.transactionDate = this.transactionDate;
-      if (this.isModified('tags')) modifiedFields.tags = this.tags;
-      if (this.isModified('isDeleted')) modifiedFields.isDeleted = this.isDeleted;
-      if (this.isModified('deletedAt')) modifiedFields.deletedAt = this.deletedAt;
-
-      // Only validate if there are actually modified fields to validate
-      if (Object.keys(modifiedFields).length > 0) {
-        const validation = updateTransactionSchema.safeParse(modifiedFields);
-        
-        if (!validation.success) {
-          const error = new Error(validation.error.issues[0].message);
-          error.name = 'ValidationError';
-          return next(error);
-        }
-
-        // Apply Zod transformations for updates
-        if (validation.data.description !== undefined) this.description = validation.data.description;
-        if (validation.data.tags !== undefined) this.tags = validation.data.tags;
-      }
+    if (this.isModified('transactionDate')) {
+      const date = new Date(this.transactionDate);
+      this.year = date.getFullYear();
+      this.month = date.getMonth() + 1; // getMonth() returns 0-11
+      this.yearMonth = `${this.year}-${String(this.month).padStart(2, '0')}`;
     }
-    
     next();
   } catch (error) {
     next(error);
   }
 });
 
-/**
- * Pre-save middleware for business logic validation
- */
-TransactionSchema.pre('save', async function(next) {
-  try {
-    // STEP 1: Validate category exists and belongs to user
-    if (this.isModified('categoryId')) {
-      const Category = mongoose.model('Category');
-      
-      const category = await Category.findOne({
-        _id: this.categoryId,
-        userId: this.userId,
-        isDeleted: false
-      });
-      
-      if (!category) {
-        const error = new Error('Category not found or does not belong to user');
-        error.name = 'ValidationError';
-        return next(error);
-      }
-      
-      // Auto-set type from category if not provided or different
-      if (!this.type || this.type !== category.type) {
-        this.type = category.type;
-      }
-    }
-
-    // STEP 2: Enforce daily transaction limits (NEW TRANSACTIONS ONLY)
-    if (this.isNew) {
-      const today = new Date(this.transactionDate);
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-
-      const dailyCount = await this.constructor.countDocuments({
-        userId: this.userId,
-        transactionDate: {
-          $gte: startOfDay,
-          $lt: endOfDay
-        },
-        isDeleted: false
-      });
-
-      if (dailyCount >= 100) {
-        const error = new Error('Daily transaction limit of 100 has been reached');
-        error.name = 'ValidationError';
-        return next(error);
-      }
-    }
-    
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
 
 /**
  * Pre-save middleware for soft delete logic
  */
 TransactionSchema.pre('save', function(next) {
-  // Set deletedAt timestamp when marking as deleted
-  if (this.isModified('isDeleted') && this.isDeleted && !this.deletedAt) {
-    this.deletedAt = new Date();
+  try {
+    // Set deletedAt timestamp when marking as deleted
+    if (this.isModified('isDeleted') && this.isDeleted && !this.deletedAt) {
+      this.deletedAt = new Date();
+    }
+    // Clear deletedAt when undeleting
+    if (this.isModified('isDeleted') && !this.isDeleted && this.deletedAt) {
+      this.deletedAt = null;
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  
-  // Clear deletedAt when undeleting
-  if (this.isModified('isDeleted') && !this.isDeleted && this.deletedAt) {
-    this.deletedAt = null;
-  }
-  
-  next();
 });
 
-/**
- * Pre-save middleware for tag processing
- */
-TransactionSchema.pre('save', function(next) {
-  // Clean up tags: remove duplicates, empty strings, and enforce limits
-  if (this.isModified('tags')) {
-    const cleanTags = [...new Set(this.tags)]
-      .filter(tag => tag && tag.trim().length > 0)
-      .slice(0, 3); // Max 3 tags as per DB_SCHEMA.MD
-    
-    this.tags = cleanTags;
-  }
-  
-  next();
-});
 
 // =================================================================
 //                      INSTANCE METHODS
@@ -382,14 +256,20 @@ TransactionSchema.methods.isExpense = function() {
  * @returns {Promise<Transaction>} - Updated transaction
  */
 TransactionSchema.methods.addTag = async function(tag) {
-  const cleanTag = tag.toLowerCase().trim();
-  
-  if (cleanTag && !this.tags.includes(cleanTag) && this.tags.length < 3) {
-    this.tags.push(cleanTag);
-    return await this.save();
+  try {
+    const cleanTag = tag.toLowerCase().trim();
+    if (cleanTag && !this.tags.includes(cleanTag) && this.tags.length < 3) {
+      this.tags.push(cleanTag);
+      return await this.save();
+    }
+    return this;
+  } catch (error) {
+    if (error.status) throw error;
+    const modelError = new Error('Failed to add tag');
+    modelError.status = 500;
+    modelError.code = 'ADD_TAG_ERROR';
+    throw modelError;
   }
-  
-  return this;
 };
 
 /**
@@ -398,9 +278,17 @@ TransactionSchema.methods.addTag = async function(tag) {
  * @returns {Promise<Transaction>} - Updated transaction
  */
 TransactionSchema.methods.removeTag = async function(tag) {
-  const cleanTag = tag.toLowerCase().trim();
-  this.tags = this.tags.filter(t => t !== cleanTag);
-  return await this.save();
+  try {
+    const cleanTag = tag.toLowerCase().trim();
+    this.tags = this.tags.filter(t => t !== cleanTag);
+    return await this.save();
+  } catch (error) {
+    if (error.status) throw error;
+    const modelError = new Error('Failed to remove tag');
+    modelError.status = 500;
+    modelError.code = 'REMOVE_TAG_ERROR';
+    throw modelError;
+  }
 };
 
 /**
@@ -408,9 +296,17 @@ TransactionSchema.methods.removeTag = async function(tag) {
  * @returns {Promise<Transaction>} - Updated transaction
  */
 TransactionSchema.methods.softDelete = async function() {
-  this.isDeleted = true;
-  this.deletedAt = new Date();
-  return await this.save();
+  try {
+    this.isDeleted = true;
+    this.deletedAt = new Date();
+    return await this.save();
+  } catch (error) {
+    if (error.status) throw error;
+    const modelError = new Error('Failed to soft delete transaction');
+    modelError.status = 500;
+    modelError.code = 'SOFT_DELETE_ERROR';
+    throw modelError;
+  }
 };
 
 /**
@@ -530,7 +426,11 @@ TransactionSchema.statics.findWithFilters = async function(filters = {}, options
       }
     };
   } catch (error) {
-    throw new Error(`Failed to retrieve transactions: ${error.message}`);
+    if (error.status) throw error;
+    const modelError = new Error('Failed to retrieve transactions');
+    modelError.status = 500;
+    modelError.code = 'TRANSACTION_QUERY_ERROR';
+    throw modelError;
   }
 };
 
@@ -592,7 +492,11 @@ TransactionSchema.statics.getMonthlySummary = async function(userId, year, month
     
     return result;
   } catch (error) {
-    throw new Error(`Failed to generate monthly summary: ${error.message}`);
+    if (error.status) throw error;
+    const modelError = new Error('Failed to generate monthly summary');
+    modelError.status = 500;
+    modelError.code = 'MONTHLY_SUMMARY_ERROR';
+    throw modelError;
   }
 };
 
@@ -657,20 +561,14 @@ TransactionSchema.statics.getCategoryBreakdown = async function(userId, dateRang
       }
     ]);
   } catch (error) {
-    throw new Error(`Failed to generate category breakdown: ${error.message}`);
+    if (error.status) throw error;
+    const modelError = new Error('Failed to generate category breakdown');
+    modelError.status = 500;
+    modelError.code = 'CATEGORY_BREAKDOWN_ERROR';
+    throw modelError;
   }
 };
 
-/**
- * Validate transaction data against Zod schema
- * @param {Object} transactionData - Transaction data to validate
- * @param {boolean} isUpdate - Whether this is an update operation
- * @returns {Object} - Validation result
- */
-TransactionSchema.statics.validateData = function(transactionData, isUpdate = false) {
-  const schema = isUpdate ? updateTransactionSchema : createTransactionSchema;
-  return schema.safeParse(transactionData);
-};
 
 
 
