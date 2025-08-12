@@ -89,14 +89,9 @@ router.get('/', (req, res) => {
         auth: {
           base: '/api/v1/auth',
           routes: {
-            'POST /register': 'User registration with email verification',
+            'POST /register': 'User registration',
             'POST /login': 'User authentication with email/password',
-            'POST /refresh': 'Token refresh (requires valid token)',
-            'POST /forgot-password': 'Request password reset email',
-            'POST /reset-password': 'Reset password using token',
-            'POST /verify-email': 'Verify email address using token',
-            'POST /request-otp': 'Request OTP for passwordless login',
-            'POST /verify-otp': 'Verify OTP and authenticate user'
+            'POST /refresh': 'Token refresh (requires valid token)'
           }
         },
         users: {
@@ -108,25 +103,46 @@ router.get('/', (req, res) => {
             'POST /me/change-password': 'Change user password',
             'DELETE /me': 'Delete user account'
           }
+        },
+        categories: {
+          base: '/api/v1/categories',
+          routes: {
+            'POST /': 'Create category',
+            'GET /': 'List categories',
+            'GET /hierarchy': 'Get category hierarchy',
+            'GET /:id': 'Get category by id',
+            'PATCH /:id': 'Update category',
+            'DELETE /:id': 'Soft delete category',
+            'PATCH /:id/set-default': 'Set default category for type'
+          }
+        },
+        transactions: {
+          base: '/api/v1/transactions',
+          routes: {
+            'GET /': 'List transactions with filters and pagination',
+            'POST /': 'Create transaction',
+            'GET /summary': 'Get transaction summary',
+            'GET /category-breakdown': 'Get category breakdown',
+            'GET /:id': 'Get transaction by id',
+            'PATCH /:id': 'Update transaction',
+            'DELETE /:id': 'Soft delete transaction',
+            'POST /:id/clone': 'Clone transaction'
+          }
         }
       },
       authentication: {
         type: 'Bearer JWT token required for protected routes',
         flows: [
-          'Email/Password login',
-          'OTP (passwordless) login',
-          'Email verification required for new accounts',
-          'Password reset via email token'
+          'Email/Password login'
         ]
       },
       contentType: 'application/json',
       features: [
         'JWT-based authentication',
-        'Email verification system',
-        'Password reset functionality', 
-        'OTP (passwordless) authentication',
         'Comprehensive input validation',
-        'Background email processing'
+        'User profile and settings management',
+        'Categories with hierarchy and default handling',
+        'Transactions with analytics (summary, breakdown)'
       ],
       status: 'Production Ready'
     }
