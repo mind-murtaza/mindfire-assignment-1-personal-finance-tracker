@@ -118,10 +118,12 @@ async function auth(req, res, next) {
     next();
   } catch (error) {
     // Handle unexpected errors
-    return res.status(500).json({
+    const status = error.status || 500;
+    const code = error.code || 'AUTH_MIDDLEWARE_ERROR';
+    return res.status(status).json({
       success: false,
-      error: 'Authentication failed',
-      code: 'AUTH_MIDDLEWARE_ERROR'
+      error: error.message || 'Authentication failed',
+      code
     });
   }
 }

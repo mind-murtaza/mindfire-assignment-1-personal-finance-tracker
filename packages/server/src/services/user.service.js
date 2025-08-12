@@ -26,25 +26,41 @@ const { User } = require('../models');
  * @since 1.0.0
  */
 async function updateUserProfile(userId, profileData) {
-  const user = await User.findById(userId);
-  if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      const err = new Error('User not found');
+      err.status = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+    return await user.updateProfile(profileData);
+  } catch (error) {
+    if (error.status) throw error;
+    const err = new Error('Profile update failed');
+    err.status = 500;
+    err.code = 'PROFILE_UPDATE_ERROR';
     throw err;
   }
-  
-  return await user.updateProfile(profileData);
 }
 
 async function updateUserSettings(userId, settingsData) {
-  const user = await User.findById(userId);
-  if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      const err = new Error('User not found');
+      err.status = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+    return await user.updateSettings(settingsData);
+  } catch (error) {
+    if (error.status) throw error;
+    const err = new Error('Settings update failed');
+    err.status = 500;
+    err.code = 'SETTINGS_UPDATE_ERROR';
     throw err;
   }
-  
-  return await user.updateSettings(settingsData);
 }
 
 /**
@@ -61,23 +77,31 @@ async function updateUserSettings(userId, settingsData) {
  * @since 1.0.0
  */
 async function changePassword(userId, currentPassword, newPassword) {
-  const user = await User.findById(userId).select('+password');
-  if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+  try {
+    const user = await User.findById(userId).select('+password');
+    if (!user) {
+      const err = new Error('User not found');
+      err.status = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      const err = new Error('Current password is incorrect');
+      err.status = 400;
+      err.code = 'INVALID_CURRENT_PASSWORD';
+      throw err;
+    }
+
+    await user.updatePassword(newPassword);
+  } catch (error) {
+    if (error.status) throw error;
+    const err = new Error('Password change failed');
+    err.status = 500;
+    err.code = 'PASSWORD_CHANGE_ERROR';
     throw err;
   }
-
-  // Use existing User model method for password comparison
-  const isCurrentPasswordValid = await user.comparePassword(currentPassword);
-  if (!isCurrentPasswordValid) {
-    const err = new Error('Current password is incorrect');
-    err.status = 400;
-    throw err;
-  }
-
-  // Use model's updatePassword method
-  await user.updatePassword(newPassword);
 }
 
 /**
@@ -91,15 +115,22 @@ async function changePassword(userId, currentPassword, newPassword) {
  * @since 1.0.0
  */
 async function softDelete(userId) {
-  const user = await User.findById(userId);
-  if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      const err = new Error('User not found');
+      err.status = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+    await user.softDelete();
+  } catch (error) {
+    if (error.status) throw error;
+    const err = new Error('Account deletion failed');
+    err.status = 500;
+    err.code = 'ACCOUNT_DELETE_ERROR';
     throw err;
   }
-  
-  // Use existing User model softDelete method
-  await user.softDelete();
 }
 
 module.exports = {

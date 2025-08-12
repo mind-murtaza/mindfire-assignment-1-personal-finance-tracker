@@ -24,9 +24,44 @@ const changePasswordSchema = z.object({
 
 // Protected user routes - all require authentication
 router.get('/me', auth, userController.me);
-router.patch('/me/profile', auth, validate(profileUpdateSchema), userController.updateProfile);
-router.patch('/me/settings', auth, validate(settingsUpdateSchema), userController.updateSettings);
-router.post('/me/change-password', auth, validate(changePasswordSchema), userController.changePassword);
+router.patch(
+  '/me/profile',
+  auth,
+  validate(profileUpdateSchema),
+  (err, req, res, next) => {
+    if (err && err.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid profile payload' });
+    }
+    return next(err);
+  },
+  userController.updateProfile
+);
+
+router.patch(
+  '/me/settings',
+  auth,
+  validate(settingsUpdateSchema),
+  (err, req, res, next) => {
+    if (err && err.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid settings payload' });
+    }
+    return next(err);
+  },
+  userController.updateSettings
+);
+
+router.post(
+  '/me/change-password',
+  auth,
+  validate(changePasswordSchema),
+  (err, req, res, next) => {
+    if (err && err.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid password payload' });
+    }
+    return next(err);
+  },
+  userController.changePassword
+);
 router.delete('/me', auth, userController.softDelete);
 
 module.exports = router;

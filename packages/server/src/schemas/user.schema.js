@@ -48,7 +48,7 @@ const userStatusSchema = z
 				"Status must be: active, suspended, pending_verification, or deleted",
 		}),
 	})
-	.default("pending_verification");
+	.default("active");
 
 // Authentication system schema - reuse from common.schema.js (DRY principle)
 const authSystemsSchema = z

@@ -300,12 +300,22 @@ UserSchema.pre("save", async function (next) {
  * @returns {Promise<boolean>}
  */
 UserSchema.methods.comparePassword = async function (candidatePassword) {
-	try {
-        const user = await this.constructor.findById(this._id).select('+password');
-		return await bcrypt.compare(candidatePassword, user.password);
-	} catch (error) {
-		throw new Error("Password comparison failed");
-	}
+  try {
+    const user = await this.constructor.findById(this._id).select('+password');
+    if (!user || !user.password) {
+      const err = new Error('Password not set');
+      err.status = 400;
+      err.code = 'PASSWORD_NOT_SET';
+      throw err;
+    }
+    return await bcrypt.compare(candidatePassword, user.password);
+  } catch (error) {
+    if (error.status) throw error;
+    const err = new Error('Password comparison failed');
+    err.status = 500;
+    err.code = 'PASSWORD_COMPARE_ERROR';
+    throw err;
+  }
 };
 
 // =================================================================
@@ -362,12 +372,15 @@ UserSchema.methods.getStatusInfo = function () {
  * await user.updateLastLogin();
  */
 UserSchema.methods.updateLastLogin = async function () {
-	try {
-		this.lastLoginAt = new Date();
-		return await this.save();
-	} catch (error) {
-		throw new Error(`Last login update failed: ${error.message}`);
-	}
+  try {
+    this.lastLoginAt = new Date();
+    return await this.save();
+  } catch (error) {
+    const err = new Error(`Last login update failed: ${error.message}`);
+    err.status = 500;
+    err.code = 'LAST_LOGIN_UPDATE_ERROR';
+    throw err;
+  }
 };
 
 /**
@@ -378,18 +391,19 @@ UserSchema.methods.updateLastLogin = async function () {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.updateProfile = async function (profileData) {
-	try {
-		// Only update fields that are actually provided (not undefined)
-		Object.keys(profileData).forEach(key => {
-			if (profileData[key] !== undefined && this.profile.hasOwnProperty(key)) {
-				this.profile[key] = profileData[key];
-			}
-		});
-		
-		return await this.save(); // Triggers pre-save validation
-	} catch (error) {
-		throw new Error(`Profile update failed: ${error.message}`);
-	}
+  try {
+    Object.keys(profileData).forEach(key => {
+      if (profileData[key] !== undefined && this.profile.hasOwnProperty(key)) {
+        this.profile[key] = profileData[key];
+      }
+    });
+    return await this.save();
+  } catch (error) {
+    const err = new Error(`Profile update failed: ${error.message}`);
+    err.status = 500;
+    err.code = 'PROFILE_UPDATE_ERROR';
+    throw err;
+  }
 };
 
 /**
@@ -400,18 +414,19 @@ UserSchema.methods.updateProfile = async function (profileData) {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.updateSettings = async function (settingsData) {
-	try {
-		// Only update fields that are actually provided (not undefined)
-		Object.keys(settingsData).forEach(key => {
-			if (settingsData[key] !== undefined && this.settings.hasOwnProperty(key)) {
-				this.settings[key] = settingsData[key];
-			}
-		});
-		
-		return await this.save(); // Triggers pre-save validation
-	} catch (error) {
-		throw new Error(`Settings update failed: ${error.message}`);
-	}
+  try {
+    Object.keys(settingsData).forEach(key => {
+      if (settingsData[key] !== undefined && this.settings.hasOwnProperty(key)) {
+        this.settings[key] = settingsData[key];
+      }
+    });
+    return await this.save();
+  } catch (error) {
+    const err = new Error(`Settings update failed: ${error.message}`);
+    err.status = 500;
+    err.code = 'SETTINGS_UPDATE_ERROR';
+    throw err;
+  }
 };
 
 /**
@@ -422,12 +437,15 @@ UserSchema.methods.updateSettings = async function (settingsData) {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.updatePassword = async function (newPassword) {
-	try {
-		this.password = newPassword;
-		return await this.save(); // Triggers pre-save validation and hashing
-	} catch (error) {
-		throw new Error(`Password update failed: ${error.message}`);
-	}
+  try {
+    this.password = newPassword;
+    return await this.save();
+  } catch (error) {
+    const err = new Error(`Password update failed: ${error.message}`);
+    err.status = 500;
+    err.code = 'PASSWORD_UPDATE_ERROR';
+    throw err;
+  }
 };
 
 /**
@@ -437,12 +455,15 @@ UserSchema.methods.updatePassword = async function (newPassword) {
  * @returns {Promise<UserDocument>}
  */
 UserSchema.methods.softDelete = async function () {
-	try {
-		this.status = "deleted";
-		return await this.save();
-	} catch (error) {
-		throw new Error(`Soft delete failed: ${error.message}`);
-	}
+  try {
+    this.status = "deleted";
+    return await this.save();
+  } catch (error) {
+    const err = new Error(`Soft delete failed: ${error.message}`);
+    err.status = 500;
+    err.code = 'USER_SOFT_DELETE_ERROR';
+    throw err;
+  }
 };
 
 /**
@@ -487,28 +508,24 @@ UserSchema.statics.findByEmail = function (email) {
  * @returns {Promise<{users: UserDocument[], total: number}>}
  */
 UserSchema.statics.findActiveUsers = async function (options = {}) {
-	try {
-		const {
-			page = 1,
-			limit = 20,
-			sortBy = "createdAt",
-			sortOrder = "desc",
-		} = options;
-		const skip = (page - 1) * limit;
-
-		const [users, total] = await Promise.all([
-			this.find({ status: "active" })
-				.sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
-				.skip(skip)
-				.limit(limit)
-				.lean(),
-			this.countDocuments({ status: "active" }),
-		]);
-
-		return { users, total };
-	} catch (error) {
-		throw new Error(`Find active users failed: ${error.message}`);
-	}
+  try {
+    const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" } = options;
+    const skip = (page - 1) * limit;
+    const [users, total] = await Promise.all([
+      this.find({ status: "active" })
+        .sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.countDocuments({ status: "active" }),
+    ]);
+    return { users, total };
+  } catch (error) {
+    const err = new Error(`Find active users failed: ${error.message}`);
+    err.status = 500;
+    err.code = 'FIND_ACTIVE_USERS_ERROR';
+    throw err;
+  }
 };
 
 

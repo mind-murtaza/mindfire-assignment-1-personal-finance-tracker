@@ -3,6 +3,7 @@ const {
     objectIdSchema,
     hexColorSchema,
     categoryTypeSchema,
+    nameSchema
 } = require('./common.schema');
 
 const categoryIconSchema = z.string()
@@ -19,39 +20,56 @@ const monthlyBudgetSchema = z.number()
   .default(0)
   .describe('Monthly budget amount');
 
+// Wrap with safe messages to standardize error surfaces
 const createCategorySchema = z.object({
-  userId: objectIdSchema,
-  name: z.string()
-    .min(1, 'Category name is required')
-    .max(50, 'Category name cannot exceed 50 characters')
-    .trim(),
+  name: nameSchema,
   type: categoryTypeSchema,
   parentId: objectIdSchema.optional().nullable(),
   color: hexColorSchema,
   icon: categoryIconSchema,
   isDefault: z.boolean().default(false),
   monthlyBudget: monthlyBudgetSchema
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  // Prevent self-parenting at schema level when present
+  if (data.parentId && typeof data.parentId === 'string' && data.parentId === data._id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Category cannot be its own parent', path: ['parentId'] });
+  }
+});
 
-// UPDATE SCHEMA - Only allow safe field updates
 const updateCategorySchema = z.object({
-  name: z.string()
-    .min(1, 'Category name is required')
-    .max(50, 'Category name cannot exceed 50 characters')
-    .trim()
-    .optional(),
+  name: nameSchema.optional(),
   color: hexColorSchema.optional(),
   icon: categoryIconSchema.optional(),
   isDefault: z.boolean().optional(),
   monthlyBudget: monthlyBudgetSchema.optional(),
-  isDeleted: z.boolean().optional(),
-  deletedAt: z.date().optional().nullable()
+}).strict()
+.refine((data) => Object.keys(data).length > 0, "At least one field is required to update");
+
+// BUSINESS LOGIC VALIDATION SCHEMAS
+const parentCategoryValidationSchema = z.object({
+  userId: objectIdSchema,
+  type: categoryTypeSchema,
+  parentId: objectIdSchema,
+  exists: z.boolean(),
+  depth: z.number().max(2, 'Maximum 3 levels allowed (current depth + 1 would exceed limit)')
 }).strict();
-// REMOVED: type, parentId, userId - These are forbidden updates
+
+const categoryUniquenessSchema = z.object({
+  userId: objectIdSchema,
+  type: categoryTypeSchema,
+  name: nameSchema,
+}).strict();
 
 module.exports = {
+    // Field schemas
     categoryIconSchema,
     monthlyBudgetSchema,
+    
+    // Model schemas
     createCategorySchema,
     updateCategorySchema,
+    
+    // Business validation schemas
+    parentCategoryValidationSchema,
+    categoryUniquenessSchema,
 };

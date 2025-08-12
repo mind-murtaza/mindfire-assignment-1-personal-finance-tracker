@@ -7,11 +7,6 @@ const { createUserSchema } = require('../../schemas/user.schema');
 const {
     emailSchema,
     passwordSchema,
-    forgotPasswordRequestSchema,
-    resetPasswordRequestSchema,
-    verifyEmailRequestSchema,
-    requestOtpSchema,
-    verifyOtpSchema
   } = require('../../schemas/common.schema');
 
 
@@ -20,16 +15,19 @@ const loginSchema = z.object({
   password: passwordSchema,
 }).strict();
 
-// Public routes (no authentication required)
-router.post('/register', validate(createUserSchema), authController.register);
-router.post('/login', validate(loginSchema), authController.login);
-router.post('/forgot-password', validate(forgotPasswordRequestSchema), authController.forgotPassword);
-router.post('/reset-password', validate(resetPasswordRequestSchema), authController.resetPassword);
-router.post('/verify-email', validate(verifyEmailRequestSchema), authController.verifyEmail);
-router.post('/request-otp', validate(requestOtpSchema), authController.requestOtp);
-router.post('/verify-otp', validate(verifyOtpSchema), authController.verifyOtp);
+router.post('/register', validate(createUserSchema), (err, req, res, next) => {
+  if (err && err.name === 'ZodError') {
+    return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid registration payload' });
+  }
+  return next(err);
+}, authController.register);
 
-// Protected routes (authentication required)
+router.post('/login', validate(loginSchema), (err, req, res, next) => {
+  if (err && err.name === 'ZodError') {
+    return res.status(400).json({ success: false, error: err.issues?.[0]?.message || 'Invalid login payload' });
+  }
+  return next(err);
+}, authController.login);
 router.post('/refresh', auth, authController.refresh);
 
 module.exports = router;

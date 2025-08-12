@@ -12,6 +12,20 @@
 
 const userService = require('../services/user.service');
 
+function forwardUserError(err, next) {
+  // Duplicate key from Mongo
+  if (err && (err.code === 11000 || err.code === 11001)) {
+    err.status = err.status || 409;
+    err.message = err.message || 'Duplicate resource';
+    err.code = err.code || 'DUPLICATE_RESOURCE';
+  }
+  if (!err.status) {
+    err.status = 500;
+    err.code = err.code || 'USER_CONTROLLER_ERROR';
+  }
+  return next(err);
+}
+
 /**
  * Get current authenticated user's profile information.
  * Returns the complete user object excluding sensitive fields.
@@ -37,7 +51,7 @@ const me = async (req, res, next) => {
       data: req.user 
     });
   } catch (err) {
-    next(err);
+    forwardUserError(err, next);
   }
 };
 
@@ -75,7 +89,7 @@ const updateProfile = async (req, res, next) => {
       data: updated 
     });
   } catch (err) {
-    next(err);
+    forwardUserError(err, next);
   }
 };
 
@@ -112,7 +126,7 @@ const updateSettings = async (req, res, next) => {
       data: updated 
     });
   } catch (err) {
-    next(err);
+    forwardUserError(err, next);
   }
 };
 
@@ -149,7 +163,7 @@ const changePassword = async (req, res, next) => {
       success: true 
     });
   } catch (err) {
-    next(err);
+    forwardUserError(err, next);
   }
 };
 
@@ -178,7 +192,7 @@ const softDelete = async (req, res, next) => {
     await userService.softDelete(req.auth.userId);
     res.status(204).send();
   } catch (err) {
-    next(err);
+    forwardUserError(err, next);
   }
 };
 

@@ -1,20 +1,13 @@
 const request = require('supertest');
-// Mock email service to avoid real SMTP during tests
-jest.mock('../../src/utils/email/emailService', () => ({
-  sendEmailVerification: jest.fn().mockResolvedValue(),
-  sendWelcomeEmail: jest.fn().mockResolvedValue(),
-  sendPasswordReset: jest.fn().mockResolvedValue(),
-  sendOTPCode: jest.fn().mockResolvedValue(),
-}));
 const app = require('../../src/app');
 const { User, Category } = require('../../src/models');
 const jwt = require('jsonwebtoken');
 
 async function registerAndLogin(overrides = {}) {
   const user = { email: 'user@test.com', password: 'ValidPass123!', profile: { firstName: 'John', lastName: 'Doe' }, ...overrides };
-  const reg = await request(app).post('/api/v1/auth/register').send(user).expect(201);
-  const { token } = reg.body; // email verification token
-  await request(app).post('/api/v1/auth/verify-email').send({ token }).expect(200);
+  await request(app).post('/api/v1/auth/register').send(user).expect(201);
+  // Activate user directly (no email verification flow)
+  await User.updateOne({ email: user.email }, { $set: { status: 'active' } });
   const res = await request(app).post('/api/v1/auth/login').send({ email: user.email, password: user.password }).expect(200);
   return res.body.data.token;
 }

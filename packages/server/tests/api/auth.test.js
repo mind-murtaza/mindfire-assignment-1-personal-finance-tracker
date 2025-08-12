@@ -1,11 +1,4 @@
 const request = require('supertest');
-// Mock email service to avoid real SMTP in tests
-jest.mock('../../src/utils/email/emailService', () => ({
-  sendEmailVerification: jest.fn().mockResolvedValue(),
-  sendWelcomeEmail: jest.fn().mockResolvedValue(),
-  sendPasswordReset: jest.fn().mockResolvedValue(),
-  sendOTPCode: jest.fn().mockResolvedValue(),
-}));
 const app = require('../../src/app');
 const { User, Category } = require('../../src/models');
 const jwt = require('jsonwebtoken');
@@ -30,12 +23,12 @@ describe('Auth API - Murtaza\'s Adversarial Testing Suite', () => {
         .expect(201);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toBe('Registration successful, please check your email for verification');
+      expect(res.body.message).toBe('Registration successful');
       expect(res.body.statusCode).toBe(201);
       // Our API doesn't return user/token immediately - email verification required
     });
 
-    it('should create default categories for new user (background process)', async () => {
+    it('should create default categories for new user', async () => {
       const userData = baseUser();
       await request(app).post('/api/v1/auth/register').send(userData).expect(201);
       
@@ -43,8 +36,7 @@ describe('Auth API - Murtaza\'s Adversarial Testing Suite', () => {
       const user = await User.findOne({ email: userData.email });
       expect(user).toBeDefined();
       
-      // Wait a bit for background category creation (setImmediate)
-      await new Promise(resolve => setTimeout(resolve, 100));
+      
       
       const defaults = await Category.find({ userId: user._id, isDefault: true, isDeleted: false });
       expect(defaults.length).toBe(2); // Salary + Food & Dining
@@ -247,9 +239,8 @@ describe('Auth API - Murtaza\'s Adversarial Testing Suite', () => {
 
   describe('🔒 POST /api/v1/auth/login - Security & Attack Prevention', () => {
     beforeEach(async () => {
-      const reg = await request(app).post('/api/v1/auth/register').send(baseUser()).expect(201);
-      const { token } = reg.body;
-      await request(app).post('/api/v1/auth/verify-email').send({ token }).expect(200);
+      await request(app).post('/api/v1/auth/register').send(baseUser()).expect(201);
+      await User.updateOne({ email: 'user@test.com' }, { $set: { status: 'active' } });
     });
 
     it('should authenticate and return token', async () => {
@@ -387,9 +378,8 @@ describe('Auth API - Murtaza\'s Adversarial Testing Suite', () => {
     let validToken;
 
     beforeEach(async () => {
-      const reg = await request(app).post('/api/v1/auth/register').send(baseUser()).expect(201);
-      const { token } = reg.body;
-      await request(app).post('/api/v1/auth/verify-email').send({ token }).expect(200);
+      await request(app).post('/api/v1/auth/register').send(baseUser()).expect(201);
+      await User.updateOne({ email: 'user@test.com' }, { $set: { status: 'active' } });
 
       const res = await request(app)
         .post('/api/v1/auth/login')
