@@ -4,14 +4,28 @@ const log = createLogger("api:auth");
 import type { LoginInput, RegisterInput } from "../../lib/validation/auth";
 
 export interface AuthUserProfile {
-	firstName?: string;
-	lastName?: string;
+	firstName: string;
+	lastName: string;
+	avatar?: string;
+	mobileNumber?: string;
+}
+
+export interface AuthUserSettings {
+	mobileDialCode?: string;
+	currency?: string;
+	theme?: string;
 }
 
 export interface AuthUser {
 	id: string;
 	email: string;
-	profile?: AuthUserProfile;
+	fullName?: string;
+	status?: string;
+	initials?: string;
+	profile: AuthUserProfile;
+	settings?: AuthUserSettings;
+	lastLoginAt?: string;
+	createdAt?: string;
 }
 
 type ApiAuthResponse = {

@@ -3,6 +3,7 @@ import ProtectedRoute from './ProtectedRoute'
 import PublicRoute from './PublicRoute'
 import Login from '../pages/Login'
 import Register from '../pages/Register'
+import Profile from '../pages/Profile'
 
 function DashboardStub() {
   return (
@@ -23,6 +24,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardStub />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         }
       />

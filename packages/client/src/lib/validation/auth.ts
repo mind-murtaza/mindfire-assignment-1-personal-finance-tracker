@@ -38,8 +38,7 @@ const registerSchema = z.object({
   lastName: makeNameSchema('Last name'),
 })
 
-export { loginSchema, registerSchema }
-
+export { loginSchema, registerSchema, makeNameSchema }
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 

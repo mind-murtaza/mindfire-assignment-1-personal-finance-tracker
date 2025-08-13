@@ -25,7 +25,7 @@ export const loginThunk = createAsyncThunk(
 	"auth/login",
 	async (payload: LoginInput, { rejectWithValue }) => {
 		try {
-            const { token, user } = await loginApi(payload);
+			const { token, user } = await loginApi(payload);
 			setToken(token);
 			return { token, user };
 		} catch {
@@ -67,6 +67,9 @@ const authSlice = createSlice({
 			state.user = null;
 			clearToken();
 		},
+		setUser(state, action: PayloadAction<AuthUser>) {
+			state.user = action.payload;
+		},
 	},
 	extraReducers: (builder) => {
 		builder
@@ -74,13 +77,13 @@ const authSlice = createSlice({
 				state.status = "loading";
 				state.error = null;
 			})
-            .addCase(
-                loginThunk.fulfilled,
-                (state, action: PayloadAction<{ token: string; user: AuthUser }>) => {
-                    state.status = "succeeded";
-                    state.user = action.payload.user;
-                }
-            )
+			.addCase(
+				loginThunk.fulfilled,
+				(state, action: PayloadAction<{ token: string; user: AuthUser }>) => {
+					state.status = "succeeded";
+					state.user = action.payload.user;
+				}
+			)
 			.addCase(loginThunk.rejected, (state, action) => {
 				state.status = "failed";
 				state.error = (action.payload as string) ?? "Login failed";
@@ -90,13 +93,13 @@ const authSlice = createSlice({
 				state.status = "loading";
 				state.error = null;
 			})
-            .addCase(
-                registerThunk.fulfilled,
-                (state, action: PayloadAction<{ token: string; user: AuthUser }>) => {
-                    state.status = "succeeded";
-                    state.user = action.payload.user;
-                }
-            )
+			.addCase(
+				registerThunk.fulfilled,
+				(state, action: PayloadAction<{ token: string; user: AuthUser }>) => {
+					state.status = "succeeded";
+					state.user = action.payload.user;
+				}
+			)
 			.addCase(registerThunk.rejected, (state, action) => {
 				state.status = "failed";
 				state.error = (action.payload as string) ?? "Registration failed";
@@ -119,5 +122,5 @@ const authSlice = createSlice({
 	},
 });
 
-export const { signOut } = authSlice.actions;
+export const { signOut, setUser } = authSlice.actions;
 export default authSlice.reducer;
