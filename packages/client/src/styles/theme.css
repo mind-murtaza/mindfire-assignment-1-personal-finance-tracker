@@ -41,10 +41,17 @@
   --color-success-50: #ecfdf5;  /* emerald-50 */
   --color-success-200: #a7f3d0; /* emerald-200 */
   --color-success-600: #059669; /* emerald-600 */
+
+  --color-warning-50: #fffbeb;  /* amber-50 */
+  --color-warning-200: #fde68a; /* amber-200 */
   --color-warning-600: #d97706; /* amber-600 */
+
   --color-error-50: #fef2f2;    /* red-50 */
   --color-error-200: #fecaca;   /* red-200 */
   --color-error-600: #dc2626;   /* red-600 */
+
+  --color-info-50: #f0f9ff;     /* sky-50 */
+  --color-info-200: #bae6fd;    /* sky-200 */
   --color-info-600: #0284c7;    /* sky-600 */
 
   /* Surfaces */

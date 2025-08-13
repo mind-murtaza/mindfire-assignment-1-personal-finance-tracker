@@ -5,8 +5,9 @@ import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { getMe, updateProfile, changePassword } from '../services/api/users'
 import { profileUpdateSchema, changePasswordSchema, type ProfileUpdateInput, type ChangePasswordInput } from '../lib/validation/user'
-import { useAppDispatch } from '../store/hooks'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { setUser } from '../store/authSlice'
+import { CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
@@ -22,13 +23,25 @@ function formatDate(value?: string | null) {
 export default function Profile() {
   const qc = useQueryClient()
   const dispatch = useAppDispatch()
-  const { data: user } = useQuery({ queryKey: ['me'], queryFn: getMe })
+  const reduxUser = useAppSelector((s) => s.auth.user)
+  const { data: user } = useQuery({
+    queryKey: ['me'],
+    queryFn: getMe,
+    // Seed from Redux and avoid redundant fetch if we already have user
+    initialData: reduxUser ?? undefined,
+    enabled: !reduxUser, // only fetch if not in Redux
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
 
   const [profileForm, setProfileForm] = useState<ProfileUpdateInput>({ firstName: user?.profile.firstName, lastName: user?.profile.lastName, avatarUrl: undefined, mobileNumber: user?.profile.mobileNumber })
   const [profileErrors, setProfileErrors] = useState<Partial<Record<keyof ProfileUpdateInput, string>>>({})
   const [pwdForm, setPwdForm] = useState<ChangePasswordInput>({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [pwdErrors, setPwdErrors] = useState<Partial<Record<keyof ChangePasswordInput, string>>>({})
   const [message, setMessage] = useState<string | null>(null)
+  const [messageType, setMessageType] = useState<'success' | 'warning' | 'error' | 'info' | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -45,22 +58,35 @@ export default function Profile() {
     mutationFn: updateProfile,
     onSuccess: (updated) => {
       dispatch(setUser(updated))
-      qc.invalidateQueries({ queryKey: ['me'] })
+      qc.setQueryData(['me'], updated)
       setMessage('Profile updated')
+      setMessageType('success')
     },
-    onError: () => setMessage('Failed to update profile'),
+    onError: () => {
+      setMessage('Failed to update profile')
+      setMessageType('error')
+    },
   })
 
   const changePwdMut = useMutation({
     mutationFn: changePassword,
-    onSuccess: () => setMessage('Password updated'),
-    onError: () => setMessage('Failed to update password'),
+    onSuccess: () => {
+      setMessage('Password updated')
+      setMessageType('success')
+    },
+    onError: () => {
+      setMessage('Failed to update password')
+      setMessageType('error')
+    },
   })
+
 
   function submitProfile(e: React.FormEvent) {
     e.preventDefault()
     setMessage(null)
+    setMessageType(null)
     const parsed = profileUpdateSchema.safeParse(profileForm)
+
     if (!parsed.success) {
       const fe = parsed.error.flatten().fieldErrors
       setProfileErrors({
@@ -69,15 +95,24 @@ export default function Profile() {
         avatarUrl: fe.avatarUrl?.[0] as string | undefined,
         mobileNumber: fe.mobileNumber?.[0] as string | undefined,
       })
+      setMessage('Please fix the highlighted fields')
+      setMessageType('error')
       return
     }
     setProfileErrors({})
+    if (JSON.stringify(parsed.data) === JSON.stringify(profileForm)) {
+      setMessage('No changes detected')
+      setMessageType('warning')
+      return
+    }
+
     profileMut.mutate(parsed.data)
   }
 
   function submitPassword(e: React.FormEvent) {
     e.preventDefault()
     setMessage(null)
+    setMessageType(null)
     const parsed = changePasswordSchema.safeParse(pwdForm)
     if (!parsed.success) {
       const fe = parsed.error.flatten().fieldErrors
@@ -86,6 +121,8 @@ export default function Profile() {
         newPassword: fe.newPassword?.[0],
         confirmPassword: fe.confirmPassword?.[0],
       })
+      setMessage('Please fix the highlighted fields')
+      setMessageType('error')
       return
     }
     setPwdErrors({})
@@ -117,9 +154,13 @@ export default function Profile() {
         <div
           role="status"
           aria-live="polite"
-          className={`mb-4 rounded-md border p-3 shadow-sm ${/fail|error/i.test(message) ? 'border-error-200 bg-error-50 text-error-600' : 'border-success-200 bg-success-50 text-success-600'}`}
+          className={`mb-4 rounded-md border p-3 shadow-sm border-${messageType}-200 bg-${messageType}-50 text-${messageType}-600 flex items-center gap-2`}
         >
-          {message}
+          {messageType === 'success' && <CheckCircle className="w-4 h-4" />}
+          {messageType === 'warning' && <AlertTriangle className="w-4 h-4" />}
+          {messageType === 'error' && <AlertCircle className="w-4 h-4" />}
+          {messageType === 'info' && <Info className="w-4 h-4" />}
+          <span>{message}</span>
         </div>
       )}
 

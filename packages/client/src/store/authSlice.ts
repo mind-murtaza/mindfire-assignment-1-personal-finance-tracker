@@ -8,6 +8,7 @@ import {
 } from "../services/api/auth";
 import { setToken, clearToken } from "../services/auth";
 import type { LoginInput, RegisterInput } from "../lib/validation/auth";
+import axios from 'axios';
 
 export interface AuthState {
 	user: AuthUser | null;
@@ -21,28 +22,60 @@ const initialState: AuthState = {
 	error: null,
 };
 
-export const loginThunk = createAsyncThunk(
+type RejectErr = { message: string; field?: 'email' | 'password' | 'firstName' | 'lastName' }
+
+export const loginThunk = createAsyncThunk<
+	{ token: string; user: AuthUser },
+	LoginInput,
+	{ rejectValue: RejectErr }
+>(
 	"auth/login",
 	async (payload: LoginInput, { rejectWithValue }) => {
 		try {
 			const { token, user } = await loginApi(payload);
 			setToken(token);
 			return { token, user };
-		} catch {
-			return rejectWithValue("Invalid credentials");
+		} catch (err) {
+			if (axios.isAxiosError(err)) {
+				const msg = (err.response?.data as { message?: string })?.message ?? 'Invalid credentials';
+				return rejectWithValue({ message: msg });
+			}
+			return rejectWithValue({ message: "Invalid credentials" });
 		}
 	}
 );
 
-export const registerThunk = createAsyncThunk(
+export const registerThunk = createAsyncThunk<
+	{ token: string; user: AuthUser },
+	RegisterInput,
+	{ rejectValue: RejectErr }
+>(
 	"auth/register",
 	async (payload: RegisterInput, { rejectWithValue }) => {
 		try {
 			const { token, user } = await registerApi(payload);
 			setToken(token);
 			return { token, user };
-		} catch {
-			return rejectWithValue("Registration failed");
+		} catch (err) {
+			if (axios.isAxiosError(err)) {
+				const status = err.response?.status
+				const body = err.response?.data as { 
+					code?: string; 
+					message?: string; 
+					errors?: { email?: string[] } 
+				}
+				const code = body?.code
+				const msg = body?.message ?? 'Registration failed'
+
+				if (status === 409 || code === 'EMAIL_EXISTS') {
+					return rejectWithValue({ field: 'email', message: 'Email already in use' })
+				}
+				const emailMsg = body?.errors?.email?.[0]
+				if (emailMsg) return rejectWithValue({ field: 'email', message: emailMsg })
+
+				return rejectWithValue({ message: msg })
+			}
+			return rejectWithValue({ message: "Registration failed" });
 		}
 	}
 );
@@ -86,7 +119,7 @@ const authSlice = createSlice({
 			)
 			.addCase(loginThunk.rejected, (state, action) => {
 				state.status = "failed";
-				state.error = (action.payload as string) ?? "Login failed";
+				state.error = (action.payload as RejectErr)?.message ?? "Login failed";
 			})
 
 			.addCase(registerThunk.pending, (state) => {
@@ -102,7 +135,7 @@ const authSlice = createSlice({
 			)
 			.addCase(registerThunk.rejected, (state, action) => {
 				state.status = "failed";
-				state.error = (action.payload as string) ?? "Registration failed";
+				state.error = (action.payload as RejectErr)?.message ?? "Registration failed";
 			})
 
 			.addCase(fetchMeThunk.pending, (state) => {
