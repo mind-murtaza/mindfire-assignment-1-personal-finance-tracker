@@ -11,6 +11,7 @@
  */
 
 const userService = require('../services/user.service');
+const { sanitizeUser } = require('../utils/sanitize');
 
 function forwardUserError(err, next) {
   // Duplicate key from Mongo
@@ -48,7 +49,9 @@ const me = async (req, res, next) => {
   try {
     res.json({ 
       success: true, 
-      data: req.user 
+      data: {
+        user: sanitizeUser(req.user) 
+      } 
     });
   } catch (err) {
     forwardUserError(err, next);

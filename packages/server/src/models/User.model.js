@@ -205,6 +205,7 @@ const UserSchema = new Schema(
 				},
 				attempts: {
 					type: Number,
+					select: false, // Sensitive: OTP attempts count
 					default: 0,
 					min: 0,
 					max: 5,

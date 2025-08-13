@@ -14,6 +14,7 @@
 
 const jwt = require("jsonwebtoken");
 const { User, Category } = require("../models");
+const { sanitizeUser } = require("../utils/sanitize");
 
 // =================================================================
 //                    JWT CONFIGURATION
@@ -142,7 +143,7 @@ async function login(email, password) {
     }
     const token = signToken(user);
     await user.updateLastLogin();
-    return { user, token };
+    return { user: sanitizeUser(user), token };
   } catch (error) {
     if (error.status) throw error;
     const authError = new Error("Authentication failed");
@@ -186,7 +187,7 @@ async function refresh(currentToken) {
     }
     const newToken = signToken(user);
     await user.updateLastLogin();
-    return { user, token: newToken };
+    return { user: sanitizeUser(user), token: newToken };
   } catch (error) {
     if (error.status) throw error;
     const authError = new Error("Token refresh failed");
@@ -218,6 +219,7 @@ async function register(userData) {
     }
     const user = new User(userData);
     await user.save();
+    
     try {
       await Category.createDefaultCategories(user._id);
     } catch (categoryError) {
@@ -226,7 +228,7 @@ async function register(userData) {
     return {
       success: true,
       token: signToken(user),
-      user,
+      user: sanitizeUser(user),
       message: "Registration successful",
       statusCode: 201,
     };
