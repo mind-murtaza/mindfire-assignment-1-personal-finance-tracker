@@ -1,4 +1,5 @@
-:root {
+
+@theme {
   /* Brand (Indigo) */
   --color-primary-50: #eef2ff;
   --color-primary-100: #e0e7ff;
@@ -51,6 +52,7 @@
   --duration-normal: 200ms;
   --duration-slow: 300ms;
 }
+
 
 /* Reduced motion utility (opt-in via class) */
 @media (prefers-reduced-motion: reduce) {
