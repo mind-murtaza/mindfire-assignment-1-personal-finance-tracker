@@ -154,7 +154,6 @@ const UserSchema = new Schema(
 		 */
 		lastLoginAt: {
 			type: Date,
-			select: false,
 			default: null,
 		},
 

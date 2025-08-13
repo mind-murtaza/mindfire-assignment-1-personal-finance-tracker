@@ -12,6 +12,7 @@
  */
 
 const { User } = require('../models');
+const { sanitizeUser } = require('../utils/sanitize');
 
 /**
  * Update user profile or settings using validation at route layer.
@@ -34,7 +35,8 @@ async function updateUserProfile(userId, profileData) {
       err.code = 'USER_NOT_FOUND';
       throw err;
     }
-    return await user.updateProfile(profileData);
+    const updatedUser = await user.updateProfile(profileData);
+    return { user: sanitizeUser(updatedUser) };
   } catch (error) {
     if (error.status) throw error;
     const err = new Error('Profile update failed');
@@ -53,7 +55,8 @@ async function updateUserSettings(userId, settingsData) {
       err.code = 'USER_NOT_FOUND';
       throw err;
     }
-    return await user.updateSettings(settingsData);
+    const updatedUser = await user.updateSettings(settingsData);
+    return { user: sanitizeUser(updatedUser) };
   } catch (error) {
     if (error.status) throw error;
     const err = new Error('Settings update failed');

@@ -162,9 +162,7 @@ const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
     await userService.changePassword(req.auth.userId, currentPassword, newPassword);
-    res.json({ 
-      success: true 
-    });
+    res.status(204).send();
   } catch (err) {
     forwardUserError(err, next);
   }
