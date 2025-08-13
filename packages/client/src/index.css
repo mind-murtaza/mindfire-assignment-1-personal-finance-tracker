@@ -11,6 +11,7 @@ html {
 body {
 	@apply bg-white text-slate-900 min-h-screen;
 	margin: 0;
+	font-family: var(--font-sans);
 }
 .container {
 	@apply w-full mx-auto px-4 sm:px-6 lg:px-8;

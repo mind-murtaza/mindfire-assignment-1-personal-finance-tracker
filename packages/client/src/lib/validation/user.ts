@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { makeNameSchema } from './auth'
+import { makeNameSchema, passwordSchema } from './auth'
 
 export const profileUpdateSchema = z
   .object({
@@ -37,5 +37,18 @@ export const settingsUpdateSchema = z
   })
 
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: passwordSchema,
+    newPassword: passwordSchema,
+    confirmPassword: passwordSchema,
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 
 

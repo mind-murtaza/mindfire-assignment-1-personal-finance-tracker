@@ -46,3 +46,8 @@ export async function updateSettings(
 	if (!user) throw new Error("No user in response");
 	return user as AuthUser;
 }
+
+export async function changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
+  log.info('change password')
+  await http.post('/users/me/change-password', payload)
+}
