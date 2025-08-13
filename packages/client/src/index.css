@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "./styles/theme.css";
+
+html {
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+body {
+	@apply bg-white text-slate-900 min-h-screen;
+	margin: 0;
+}
+
+/* Mobile-first responsive containers */
+.container {
+	@apply w-full mx-auto px-4 sm:px-6 lg:px-8;
+	max-width: 1280px;
+}
+
+/* Typography scale from Theme.md */
+h1 {
+	@apply text-4xl md:text-5xl font-semibold tracking-tight text-slate-900;
+}
+
+h2 {
+	@apply text-3xl md:text-4xl font-semibold tracking-tight text-slate-900;
+}
+
+h3 {
+	@apply text-2xl md:text-3xl font-semibold text-slate-900;
+}
+
+h4 {
+	@apply text-xl font-semibold text-slate-900;
+}
+
+p {
+	@apply text-base leading-7 text-slate-800;
+}
+
+small {
+	@apply text-sm leading-6 text-slate-600;
+}
