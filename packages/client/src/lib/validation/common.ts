@@ -34,12 +34,42 @@ const categoryTypeSchema = z.enum(
 	'Category type must be either "income" or "expense"'
 );
 
+const currencyAmountSchema = z
+	.number()
+	.min(0.01, "Amount must be at least $0.01")
+	.max(999999999.99, "Amount cannot exceed $999,999,999.99")
+	.multipleOf(0.01, "Amount must have at most 2 decimal places")
+	.describe("Currency amount in dollars");
+
+const paginationSchema = z
+	.object({
+		page: z.number().int().min(1).default(1),
+		limit: z.number().int().min(1).max(100).default(20),
+		sortBy: z.string().max(50).optional(),
+		sortOrder: z.enum(["asc", "desc"]).default("desc"),
+	})
+	.strict();
+
+const dateRangeSchema = z
+	.object({
+		startDate: z.date(),
+		endDate: z.date(),
+	})
+	.strict()
+	.refine((data) => data.startDate <= data.endDate, {
+		message: "Start date must be before or equal to end date",
+		path: ["endDate"],
+	});
+
 export {
 	passwordSchema,
 	makeNameSchema,
 	objectIdSchema,
 	hexColorSchema,
 	categoryTypeSchema,
+	currencyAmountSchema,
+	paginationSchema,
+	dateRangeSchema,
 };
 
 export type ObjectIdString = z.infer<typeof objectIdSchema>;
@@ -47,3 +77,6 @@ export type HexColor = z.infer<typeof hexColorSchema>;
 export type CategoryType = z.infer<typeof categoryTypeSchema>;
 export type Password = z.infer<typeof passwordSchema>;
 export type MakeName = z.infer<typeof makeNameSchema>;
+export type CurrencyAmount = z.infer<typeof currencyAmountSchema>;
+export type Pagination = z.infer<typeof paginationSchema>;
+export type DateRange = z.infer<typeof dateRangeSchema>;
