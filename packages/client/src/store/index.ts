@@ -6,12 +6,14 @@ import { configureStore } from "@reduxjs/toolkit";
 import uiReducer from "./uiSlice";
 import authReducer from "./authSlice";
 import categoriesReducer from "./categorySlice";
+import transactionsReducer from "./transactionSlice";
 
 export const store = configureStore({
   reducer: {
     ui: uiReducer,
     auth: authReducer,
     categories: categoriesReducer,
+    transactions: transactionsReducer,
   },
   devTools: process.env.NODE_ENV !== "production",
 });

@@ -9,7 +9,6 @@ import {
 import { setToken, clearToken } from "../services/auth";
 import type { LoginInput, RegisterInput } from "../lib/validation/auth";
 import axios from 'axios';
-
 export interface AuthState {
 	user: AuthUser | null;
 	status: "idle" | "loading" | "succeeded" | "failed";

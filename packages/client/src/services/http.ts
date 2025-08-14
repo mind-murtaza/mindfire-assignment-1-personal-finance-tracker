@@ -7,13 +7,15 @@ import type {
 	AxiosRequestHeaders,
 } from "axios";
 import { clearToken, getAuthHeader, getToken, setToken } from "./auth";
+import { store } from "../store";
 import { signOut } from "../store/authSlice";
-import { useAppDispatch } from "../store/hooks";
 
 const baseURL = import.meta.env.VITE_API_URL;
-const log = createLogger('http');
+const log = createLogger("http");
 
 let isRefreshing = false;
+let refreshAttempts = 0;
+const MAX_REFRESH_ATTEMPTS = 1;
 let pendingQueue: Array<{
 	resolve: (value: unknown) => void;
 	reject: (reason?: unknown) => void;
@@ -29,8 +31,7 @@ function onRefreshed(success: boolean, newToken?: string) {
 	pendingQueue.forEach(({ resolve, reject }) => {
 		if (success) resolve(newToken);
 		else {
-			const dispatch = useAppDispatch();
-			dispatch(signOut());
+			store.dispatch(signOut());
 			reject(new Error("Token refresh failed"));
 		}
 	});
@@ -38,29 +39,45 @@ function onRefreshed(success: boolean, newToken?: string) {
 }
 
 export const http: AxiosInstance = axios.create({ baseURL });
-log.info('initialized', { baseURL });
+log.info("initialized", { baseURL });
 
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 	config.headers = config.headers || {};
 	const authHeader = getAuthHeader();
 	if (authHeader) config.headers.Authorization = authHeader.Authorization;
-  log.debug('request', { url: config.url, method: config.method, hasAuth: !!authHeader });
-  return config;
+	log.debug("request", {
+		url: config.url,
+		method: config.method,
+		hasAuth: !!authHeader,
+	});
+	return config;
 });
 
 http.interceptors.response.use(
-  (response) => {
-    log.debug('response', { url: response.config?.url, status: response.status });
-    return response;
-  },
+	(response) => {
+		log.debug("response", {
+			url: response.config?.url,
+			status: response.status,
+		});
+		return response;
+	},
 	async (error: AxiosError) => {
-    log.warn('response error', { url: error.config?.url, status: error.response?.status });
+		log.warn("response error", {
+			url: error.config?.url,
+			status: error.response?.status,
+		});
 		const originalRequest = error.config as InternalAxiosRequestConfig & {
 			_retry?: boolean;
 		};
 
 		const status = error.response?.status;
-		if (status !== 401 || originalRequest?._retry) {
+		if (status !== 401 || originalRequest?._retry || refreshAttempts >= MAX_REFRESH_ATTEMPTS) {
+			// If we've already tried to refresh or exceeded max attempts, sign out
+			if (status === 401 && refreshAttempts >= MAX_REFRESH_ATTEMPTS) {
+				log.warn("Max refresh attempts exceeded, signing out");
+				clearToken();
+				store.dispatch(signOut());
+			}
 			return Promise.reject(error);
 		}
 
@@ -75,7 +92,7 @@ http.interceptors.response.use(
 			);
 		}
 
-    if (isRefreshing) {
+		if (isRefreshing) {
 			try {
 				await subscribeTokenRefresh();
 				const hdr = getAuthHeader();
@@ -97,8 +114,9 @@ http.interceptors.response.use(
 			}
 		}
 
-    isRefreshing = true;
-    log.info('refresh start');
+		isRefreshing = true;
+		refreshAttempts++;
+		log.info("refresh start", { attempt: refreshAttempts });
 		try {
 			const existing = getToken();
 			if (!existing) throw new Error("No token to refresh");
@@ -116,8 +134,9 @@ http.interceptors.response.use(
 
 			const newToken = res.data.data?.token ?? res.data.token;
 			if (!newToken) throw new Error("No token in refresh response");
-      setToken(newToken);
-      log.info('refresh success');
+			setToken(newToken);
+			refreshAttempts = 0; // Reset attempts on success
+			log.info("refresh success");
 			onRefreshed(true, newToken);
 			const hdr = getAuthHeader();
 			if (hdr) {
@@ -132,14 +151,15 @@ http.interceptors.response.use(
 				}
 			}
 			return http(originalRequest);
-    } catch (refreshErr) {
-      log.error('refresh failed');
-			onRefreshed(false);
+		} catch (refreshErr) {
+			log.error("refresh failed", refreshErr);
 			clearToken();
+			store.dispatch(signOut());
+			onRefreshed(false);
 			return Promise.reject(refreshErr);
 		} finally {
-      isRefreshing = false;
-      log.info('refresh end');
+			isRefreshing = false;
+			log.info("refresh end");
 		}
 	}
 );

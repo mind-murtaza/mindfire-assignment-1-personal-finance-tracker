@@ -2,18 +2,11 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './ProtectedRoute'
 import PublicRoute from './PublicRoute'
 import CategoriesPage from '../pages/Categories'
+import TransactionsPage from '../pages/Transactions'
 import Login from '../pages/Login'
 import Register from '../pages/Register'
 import Profile from '../pages/Profile'
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="container py-8">
-      <h2 className="text-3xl font-semibold text-neutral-900 mb-4">{title}</h2>
-      <p className="text-neutral-600">Coming soon.</p>
-    </div>
-  )
-}
 
 function DashboardStub() {
   return (
@@ -49,7 +42,7 @@ export default function AppRoutes() {
         path="/transactions"
         element={
           <ProtectedRoute>
-            <Placeholder title="Transactions" />
+            <TransactionsPage />
           </ProtectedRoute>
         }
       />
