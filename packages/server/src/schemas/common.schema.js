@@ -100,11 +100,8 @@ const hexColorSchema = z
 /**
  * Category Type Validation
  */
-const categoryTypeSchema = z.enum(["income", "expense"], {
-	errorMap: () => ({
-		message: 'Category type must be either "income" or "expense"',
-	}),
-});
+const categoryTypeSchema = z
+	.enum(["income", "expense"], 'Category type must be either "income" or "expense"');
 
 /**
  * Pagination Schema

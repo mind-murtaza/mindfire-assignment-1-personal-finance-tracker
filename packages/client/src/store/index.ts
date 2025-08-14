@@ -5,11 +5,13 @@
 import { configureStore } from "@reduxjs/toolkit";
 import uiReducer from "./uiSlice";
 import authReducer from "./authSlice";
+import categoriesReducer from "./categorySlice";
 
 export const store = configureStore({
   reducer: {
     ui: uiReducer,
     auth: authReducer,
+    categories: categoriesReducer,
   },
   devTools: process.env.NODE_ENV !== "production",
 });

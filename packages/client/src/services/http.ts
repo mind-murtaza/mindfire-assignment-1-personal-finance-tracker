@@ -7,6 +7,8 @@ import type {
 	AxiosRequestHeaders,
 } from "axios";
 import { clearToken, getAuthHeader, getToken, setToken } from "./auth";
+import { signOut } from "../store/authSlice";
+import { useAppDispatch } from "../store/hooks";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const log = createLogger('http');
@@ -26,7 +28,11 @@ function subscribeTokenRefresh(): Promise<unknown> {
 function onRefreshed(success: boolean, newToken?: string) {
 	pendingQueue.forEach(({ resolve, reject }) => {
 		if (success) resolve(newToken);
-		else reject(new Error("Token refresh failed"));
+		else {
+			const dispatch = useAppDispatch();
+			dispatch(signOut());
+			reject(new Error("Token refresh failed"));
+		}
 	});
 	pendingQueue = [];
 }

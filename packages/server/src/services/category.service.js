@@ -1,6 +1,4 @@
 const { Category } = require("../models");
-const { z } = require("zod");
-const { categoryTypeSchema } = require("../schemas/common.schema");
 const {
 	parentCategoryValidationSchema,
 	categoryUniquenessSchema,
@@ -65,7 +63,6 @@ const validateParentCategory = async (userId, type, parentId) => {
  * Validate category name uniqueness
  */
 const validateCategoryUniqueness = async (userId, type, name, categoryId = null) => {
-	// Validate input using schema
 	const validation = categoryUniquenessSchema.safeParse({
 		userId,
 		type,
@@ -77,8 +74,8 @@ const validateCategoryUniqueness = async (userId, type, name, categoryId = null)
 		error.status = 400;
 		throw error;
 	}
-
-	const query = { name, type, userId, isDeleted: false };
+	const nameLower = name.toLowerCase();
+	const query = { nameLower, type, userId, isDeleted: false };
 
 	if (categoryId) {
 		query._id = { $ne: categoryId };
@@ -136,15 +133,11 @@ const createCategory = async (userId, categoryData) => {
 };
 
 const getCategories = async (userId, query) => {
-	const { type } = z
-		.object({ type: categoryTypeSchema.optional() })
-		.parse(query);
-	return Category.findByUserAndType(userId, type);
+	return Category.findByUserAndType(userId, query.type);
 };
 
-const getCategoryHierarchy = async (userId, type) => {
-	const validatedType = categoryTypeSchema.optional().parse(type);
-	return Category.getCategoryHierarchy(userId, validatedType);
+const getCategoryHierarchy = async (userId, query) => {
+	return Category.getCategoryHierarchy(userId, query.type);
 };
 
 const getCategoryById = async (userId, categoryId) => {

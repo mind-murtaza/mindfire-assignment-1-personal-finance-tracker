@@ -4,6 +4,7 @@ const { validate } = require("../middlewares/validate");
 const {
 	createCategorySchema,
 	updateCategorySchema,
+	listCategoriesQuerySchema,
 } = require("../../schemas/category.schema");
 const categoryController = require("../../controllers/category.controller");
 
@@ -22,9 +23,17 @@ router.post(
 	validate(createCategorySchema),
 	categoryController.createCategory
 );
-router.get("/", categoryController.getCategories);
+router.get(
+	"/",
+	validate(listCategoriesQuerySchema, "query"),
+	categoryController.getCategories
+);
 
-router.get("/hierarchy", categoryController.getCategoryHierarchy);
+router.get(
+	"/hierarchy",
+	validate(listCategoriesQuerySchema, "query"),
+	categoryController.getCategoryHierarchy
+);
 
 router.get(
 	"/:id",

@@ -45,6 +45,11 @@ const updateCategorySchema = z.object({
 }).strict()
 .refine((data) => Object.keys(data).length > 0, "At least one field is required to update");
 
+// Add query schema for listing categories with optional type
+const listCategoriesQuerySchema = z.object({
+    type: categoryTypeSchema.optional(),
+}).strict();
+
 // BUSINESS LOGIC VALIDATION SCHEMAS
 const parentCategoryValidationSchema = z.object({
   userId: objectIdSchema,
@@ -72,4 +77,7 @@ module.exports = {
     // Business validation schemas
     parentCategoryValidationSchema,
     categoryUniquenessSchema,
+    
+    // Route/query schemas
+    listCategoriesQuerySchema,
 };

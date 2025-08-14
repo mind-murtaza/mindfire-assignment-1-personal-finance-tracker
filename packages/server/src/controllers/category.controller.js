@@ -53,7 +53,7 @@ const getCategoryHierarchy = async (req, res, next) => {
 	try {
 		const hierarchy = await categoryService.getCategoryHierarchy(
 			req.user.id,
-			req.query.type
+			req.query
 		);
 		res.json({
 			success: true,

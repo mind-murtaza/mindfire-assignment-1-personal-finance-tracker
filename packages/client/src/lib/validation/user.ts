@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { makeNameSchema, passwordSchema } from './auth'
+import { makeNameSchema, passwordSchema } from './common'
 
 export const profileUpdateSchema = z
   .object({

@@ -74,6 +74,12 @@ const CategorySchema = new Schema(
 			default: 0.0,
 		},
 
+		// Normalized name for case-insensitive uniqueness
+		nameLower: {
+			type: String,
+			select: false, // Don't include in queries by default
+		},
+
 		// Soft delete fields
 		isDeleted: {
 			type: Boolean,
@@ -124,9 +130,14 @@ CategorySchema.index({ userId: 1, type: 1 }, { background: true });
 CategorySchema.index({ userId: 1, isDeleted: 1 }, { background: true });
 CategorySchema.index({ parentId: 1 }, { background: true, sparse: true });
 CategorySchema.index({ userId: 1, name: 1 }, { background: true });
+// Case-insensitive unique constraint
 CategorySchema.index(
-	{ userId: 1, name: 1, type: 1, isDeleted: 1 },
-	{ background: true, unique: true }
+	{ userId: 1, type: 1, nameLower: 1 },
+	{ 
+		background: true, 
+		unique: true,
+		partialFilterExpression: { isDeleted: false }
+	}
 );
 
 // Compound index for category hierarchy queries
@@ -142,6 +153,20 @@ CategorySchema.index(
 		partialFilterExpression: { isDefault: true },
 	}
 );
+// =================================================================
+//                      MIDDLEWARE HOOKS
+// =================================================================
+
+/**
+ * Pre-save middleware to set nameLower for case-insensitive uniqueness
+ */
+CategorySchema.pre('save', function(next) {
+	if (this.isModified('name')) {
+		this.nameLower = this.name.toLowerCase().trim();
+	}
+	next();
+});
+
 // =================================================================
 //                      INSTANCE METHODS
 // =================================================================
@@ -230,7 +255,10 @@ CategorySchema.statics.findByUserAndType = function (
 	type,
 	includeDeleted = false
 ) {
-	const query = { userId, type };
+	const query = { userId };
+	if (typeof type !== "undefined" && type !== null) {
+		query.type = type;
+	}
 
 	if (!includeDeleted) {
 		query.isDeleted = false;
@@ -246,11 +274,11 @@ CategorySchema.statics.findByUserAndType = function (
  * @returns {Promise<Object>} - Hierarchical category structure
  */
 CategorySchema.statics.getCategoryHierarchy = async function (userId, type) {
-	const categories = await this.find({
-		userId,
-		type,
-		isDeleted: false,
-	}).sort({ name: 1 });
+	const query = { userId, isDeleted: false };
+	if (typeof type !== "undefined" && type !== null) {
+		query.type = type;
+	}
+	const categories = await this.find(query).sort({ name: 1 });
 
 	// Build hierarchy
 	const categoryMap = new Map();
@@ -314,7 +342,7 @@ CategorySchema.statics.createDefaultCategories = async function (userId) {
 			isDefault: false,
 		},
 		{
-			name: "Other Income",
+			name: "Others",
 			type: "income",
 			color: "#9C27B0",
 			icon: "plus-circle",
@@ -323,7 +351,7 @@ CategorySchema.statics.createDefaultCategories = async function (userId) {
 
 		// Expense categories - Only "Food & Dining" is default
 		{
-			name: "Food & Dining",
+			name: "Food",
 			type: "expense",
 			color: "#F44336",
 			icon: "utensils",
@@ -351,7 +379,7 @@ CategorySchema.statics.createDefaultCategories = async function (userId) {
 			isDefault: false,
 		},
 		{
-			name: "Bills & Utilities",
+			name: "Bills",
 			type: "expense",
 			color: "#607D8B",
 			icon: "file-text",
@@ -372,7 +400,7 @@ CategorySchema.statics.createDefaultCategories = async function (userId) {
 			isDefault: false,
 		},
 		{
-			name: "Other Expenses",
+			name: "Others",
 			type: "expense",
 			color: "#795548",
 			icon: "more-horizontal",
@@ -400,7 +428,7 @@ CategorySchema.statics.setDefaultCategory = async function (
 	categoryId
 ) {
 	// Get the category to determine its type
-  const category = await this.findOne({
+	const category = await this.findOne({
 		_id: categoryId,
 		userId,
 		isDeleted: false,
@@ -411,11 +439,11 @@ CategorySchema.statics.setDefaultCategory = async function (
 		throw error;
 	}
 
-  // Unset any other default of same type for this user
-  await this.updateOne(
-    { userId, type: category.type, isDefault: true, _id: { $ne: categoryId } },
-    { $set: { isDefault: false } }
-  );
+	// Unset any other default of same type for this user
+	await this.updateOne(
+		{ userId, type: category.type, isDefault: true, _id: { $ne: categoryId } },
+		{ $set: { isDefault: false } }
+	);
 
 	// Step 2: Set new default
 	await this.updateOne({ _id: categoryId }, { $set: { isDefault: true } });

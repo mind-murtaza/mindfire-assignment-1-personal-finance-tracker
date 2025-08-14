@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './ProtectedRoute'
 import PublicRoute from './PublicRoute'
+import CategoriesPage from '../pages/Categories'
 import Login from '../pages/Login'
 import Register from '../pages/Register'
 import Profile from '../pages/Profile'
@@ -40,7 +41,7 @@ export default function AppRoutes() {
         path="/categories"
         element={
           <ProtectedRoute>
-            <Placeholder title="Categories" />
+            <CategoriesPage />
           </ProtectedRoute>
         }
       />
