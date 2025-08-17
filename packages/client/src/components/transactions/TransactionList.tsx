@@ -140,9 +140,10 @@ export default function TransactionList({
 												size="sm"
 												onClick={() => onEdit(transaction)}
 												className="p-1.5"
-												title="Edit transaction"
+												aria-label={`Edit transaction: ${transaction.description}`}
+												title={`Edit transaction: ${transaction.description}`}
 											>
-												<Edit className="h-3.5 w-3.5" />
+												<Edit className="h-3.5 w-3.5" aria-hidden="true" />
 											</Button>
 											<Button
 												variant="destructive"

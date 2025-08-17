@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
 	fetchTransactions,
@@ -13,6 +13,7 @@ import Button from "../components/ui/Button";
 import TransactionList from "../components/transactions/TransactionList";
 import TransactionForm from "../components/transactions/TransactionForm";
 import { createLogger } from "../lib/logger";
+import { formatAmount } from "../lib/utils/formatters";
 
 const log = createLogger("TransactionsPage");
 
@@ -30,9 +31,11 @@ export default function TransactionsPage() {
 	>(null);
 	const [editingTransaction, setEditingTransaction] =
 		useState<Transaction | null>(null);
+	
+	const transactionFormRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
-		log.debug("status", status);
+		log.info("status", status);
 		if (status === "idle") {
 			dispatch(fetchTransactions({}));
 		}
@@ -75,6 +78,23 @@ export default function TransactionsPage() {
 	function onEdit(transaction: Transaction) {
 		setEditingTransaction(transaction);
 		setMessage(null);
+		
+		setTimeout(() => {
+			if (transactionFormRef.current) {
+				const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				
+				transactionFormRef.current.scrollIntoView({ 
+					behavior: prefersReducedMotion ? 'auto' : 'smooth', 
+					block: 'start',
+					inline: 'nearest'
+				});
+				
+				const formHeading = transactionFormRef.current.querySelector('#transaction-form-title');
+				if (formHeading instanceof HTMLElement) {
+					formHeading.focus();
+				}
+			}
+		}, 100);
 	}
 
 	function cancelEdit() {
@@ -125,7 +145,7 @@ export default function TransactionsPage() {
 								Total Income
 							</p>
 							<p className="text-2xl font-bold text-success-600">
-								+${summary.totalIncome.toFixed(2)}
+								{formatAmount(summary.totalIncome, "income")}
 							</p>
 							<p className="text-xs text-neutral-500">
 								{summary.incomeCount} transactions
@@ -136,7 +156,7 @@ export default function TransactionsPage() {
 								Total Expenses
 							</p>
 							<p className="text-2xl font-bold text-error-600">
-								-${summary.totalExpenses.toFixed(2)}
+								{formatAmount(summary.totalExpenses, "expense")}
 							</p>
 							<p className="text-xs text-neutral-500">
 								{summary.expenseCount} transactions
@@ -151,8 +171,7 @@ export default function TransactionsPage() {
 										: "text-error-600"
 								}`}
 							>
-								{summary.netAmount >= 0 ? "+" : ""}$
-								{summary.netAmount.toFixed(2)}
+								{formatAmount(summary.netAmount, summary.netAmount >= 0 ? "income" : "expense")}
 							</p>
 							<p className="text-xs text-neutral-500">
 								{summary.incomeCount + summary.expenseCount} total
@@ -170,10 +189,27 @@ export default function TransactionsPage() {
 					</div>
 				</Card>
 			)}
-			<Card className="p-6">
+			<Card 
+				ref={transactionFormRef} 
+				className={`p-6 motion-safe:transition-colors motion-safe:duration-300 ${
+					editingTransaction ? 'ring-2 ring-blue-500 ring-opacity-50 bg-blue-50/30' : ''
+				}`}
+			>
 				<div className="flex items-center justify-between mb-6">
-					<h2 className="text-xl font-semibold text-neutral-900">
-						{editingTransaction ? "Edit Transaction" : "Create Transaction"}
+					<h2 
+						id="transaction-form-title" 
+						className="text-xl font-semibold text-neutral-900"
+						tabIndex={-1}
+						aria-live="polite"
+					>
+						{editingTransaction ? (
+							<span className="flex items-center gap-2">
+								<span className="inline-block w-2 h-2 bg-blue-500 rounded-full motion-safe:animate-pulse" aria-hidden="true" />
+								Edit Transaction
+							</span>
+						) : (
+							"Create Transaction"
+						)}
 					</h2>
 					{editingTransaction && (
 						<Button

@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, current } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import {
 	listTransactions,
@@ -82,7 +82,6 @@ export const fetchTransactions = createAsyncThunk(
 	"transactions/fetchAll",
 	async (query: Partial<TransactionListQuery> = {}, { rejectWithValue }) => {
 		try {
-			// Default to last 7 days if no date filters
 			if (!query.startDate && !query.endDate) {
 				const now = new Date();
 				const sevenDaysAgo = new Date(now);
@@ -91,7 +90,6 @@ export const fetchTransactions = createAsyncThunk(
 				query.endDate = now;
 			}
 			const res = await listTransactions(query);
-			console.log("res", res);
 			return res;
 		} catch (error) {
 			log.error("fetchAll failed", error);
@@ -192,13 +190,8 @@ export const cloneTransactionThunk = createAsyncThunk(
 );
 
 const recalculateSummaryOnTransactionUpdate = (state: TransactionsState, oldTransaction: Transaction, newTransaction: Transaction) => {
-	if (oldTransaction.type !== newTransaction.type) {
-		updateSummary(state, oldTransaction, "subtract");
-		updateSummary(state, newTransaction, "add");
-	} else {
-		updateSummary(state, newTransaction, "subtract");
-		updateSummary(state, newTransaction, "add");
-	}
+	updateSummary(state, oldTransaction, "subtract");
+	updateSummary(state, newTransaction, "add");
 }
 
 const updateSummary = (state: TransactionsState, transaction: Transaction, action: "add" | "subtract" = "add") => {
@@ -211,23 +204,27 @@ const updateSummary = (state: TransactionsState, transaction: Transaction, actio
 			netAmount: 0,
 		}
 	}
+	
+	const amount = Number(transaction.amount.$numberDecimal);
+	
 	if (action === "add") {
 		if (transaction.type === "income") {
-			state.summary.totalIncome += Number(transaction.amount.$numberDecimal);
+			state.summary.totalIncome += amount;
 			state.summary.incomeCount += 1;
 		} else {
-			state.summary.totalExpenses += Number(transaction.amount.$numberDecimal);
+			state.summary.totalExpenses += amount;
 			state.summary.expenseCount += 1;
 		}
 	} else if (action === "subtract") {
 		if (transaction.type === "income") {
-			state.summary.totalIncome -= Number(transaction.amount.$numberDecimal);
+			state.summary.totalIncome -= amount;
 			state.summary.incomeCount -= 1;
 		} else {
-			state.summary.totalExpenses -= Number(transaction.amount.$numberDecimal);
+			state.summary.totalExpenses -= amount;
 			state.summary.expenseCount -= 1;
 		}
 	}
+	
 	state.summary.netAmount = state.summary.totalIncome - state.summary.totalExpenses;
 }
 
@@ -274,12 +271,10 @@ const slice = createSlice({
 				(state, action: PayloadAction<TransactionListResponse>) => {
 					state.status = "succeeded";
 					const { transactions, total, pagination } = action.payload;
-
+					state.summary = null;
 					// Clear existing data for fresh fetch
 					state.byId = {};
 					state.allIds = [];
-					
-					// Populate normalized state
 					for (const transaction of transactions) {
 						updateSummary(state, transaction);
 						state.byId[transaction._id] = transaction;
@@ -324,12 +319,17 @@ const slice = createSlice({
 			.addCase(
 				updateTransactionThunk.fulfilled,
 				(state, action: PayloadAction<Transaction>) => {
-					const transaction = action.payload;
-					const oldTransaction = state.byId[transaction._id];
-					recalculateSummaryOnTransactionUpdate(state, oldTransaction, transaction);
-					state.byId[transaction._id] = transaction;
-					if (!state.allIds.includes(transaction._id)) {
-						state.allIds.push(transaction._id);
+					const newTransaction = action.payload;
+					const oldTransactionProxy = state.byId[newTransaction._id];
+					const oldTransaction = oldTransactionProxy ? current(oldTransactionProxy) : null;
+					if (oldTransaction) {
+						recalculateSummaryOnTransactionUpdate(state, oldTransaction, newTransaction);
+					} else {
+						updateSummary(state, newTransaction, "add");
+					}
+					state.byId[newTransaction._id] = newTransaction;
+					if (!state.allIds.includes(newTransaction._id)) {
+						state.allIds.push(newTransaction._id);
 					}
 				}
 			)
