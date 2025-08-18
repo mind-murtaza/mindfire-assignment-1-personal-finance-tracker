@@ -1,36 +1,36 @@
 import { useEffect, useState, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import {
-	fetchTransactions,
-	createTransactionThunk,
-	updateTransactionThunk,
-	deleteTransactionThunk,
-} from "../store/transactionSlice";
+import { fetchTransactions } from "../store/transactionSlice";
 import type { Transaction } from "../services/api/transactions";
-import type { TransactionCreateInput, TransactionUpdateInput } from "../lib/validation/transaction";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import TransactionList from "../components/transactions/TransactionList";
 import TransactionForm from "../components/transactions/TransactionForm";
+import TransactionPagination from "../components/transactions/TransactionPagination";
+import TransactionFilters from "../components/transactions/TransactionFilters";
 import { createLogger } from "../lib/logger";
 import { formatAmount } from "../lib/utils/formatters";
+import { 
+	useTransactionFilters, 
+	useTransactionPagination, 
+	useTransactionMutations,
+	type TransactionCreateInput,
+	type TransactionUpdateInput
+} from "../features/transactions";
 
 const log = createLogger("TransactionsPage");
 
 export default function TransactionsPage() {
 	const dispatch = useAppDispatch();
-	const { byId, allIds, status, total, summary } = useAppSelector(
-		(s) => {
-			return s.transactions;
-		}
-	);
+	const { byId, allIds, status, summary } = useAppSelector((s) => s.transactions);
 	const items = allIds.map((id) => byId[id]);
-	const [message, setMessage] = useState<string | null>(null);
-	const [messageType, setMessageType] = useState<
-		"success" | "warning" | "error" | "info" | null
-	>(null);
-	const [editingTransaction, setEditingTransaction] =
-		useState<Transaction | null>(null);
+	
+	// Use feature hooks for cleaner separation of concerns
+	const transactionFilters = useTransactionFilters();
+	const transactionPagination = useTransactionPagination();
+	const transactionMutations = useTransactionMutations();
+	
+	const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 	
 	const transactionFormRef = useRef<HTMLDivElement>(null);
 
@@ -41,43 +41,23 @@ export default function TransactionsPage() {
 		}
 	}, [dispatch, status]);
 
-	// Create transaction handler
-	async function onCreate(data: TransactionCreateInput) {
-		setMessage(null);
-		const result = await dispatch(createTransactionThunk(data));
-		
-		if (createTransactionThunk.fulfilled.match(result)) {
-			setMessage("Transaction created successfully");
-			setMessageType("success");
-		} else {
-			setMessage("Failed to create transaction");
-			setMessageType("error");
-		}
-	}
+	// Transaction handlers using feature hooks
+	const onCreate = async (data: TransactionCreateInput) => {
+		await transactionMutations.createTransaction(data);
+	};
 
-	// Edit transaction handler
-	async function onEditSubmit(data: TransactionUpdateInput) {
+	const onEditSubmit = async (data: TransactionUpdateInput) => {
 		if (!editingTransaction) return;
 		
-		setMessage(null);
-		const result = await dispatch(updateTransactionThunk({ 
-			id: editingTransaction._id, 
-			payload: data 
-		}));
-		
-		if (updateTransactionThunk.fulfilled.match(result)) {
-			setMessage("Transaction updated successfully");
-			setMessageType("success");
+		const result = await transactionMutations.updateTransaction(editingTransaction._id, data);
+		if (result.success) {
 			setEditingTransaction(null);
-		} else {
-			setMessage("Failed to update transaction");
-			setMessageType("error");
 		}
-	}
+	};
 
 	function onEdit(transaction: Transaction) {
 		setEditingTransaction(transaction);
-		setMessage(null);
+		transactionMutations.clearMessage();
 		
 		setTimeout(() => {
 			if (transactionFormRef.current) {
@@ -99,37 +79,24 @@ export default function TransactionsPage() {
 
 	function cancelEdit() {
 		setEditingTransaction(null);
-		setMessage(null);
+		transactionMutations.clearMessage();
 	}
 
-	async function onDelete(id: string) {
+	const onDelete = async (id: string) => {
 		const transaction = byId[id];
-		const name = transaction?.description ?? "this transaction";
-		const ok = window.confirm(
-			`Are you sure you want to delete "${name}"? This action cannot be undone.`
-		);
-		if (!ok) return;
-
-		const res = await dispatch(deleteTransactionThunk(id));
-		if (deleteTransactionThunk.fulfilled.match(res)) {
-			setMessage("Transaction deleted successfully");
-			setMessageType("info");
-		} else {
-			setMessage("Failed to delete transaction");
-			setMessageType("error");
-		}
-	}
+		await transactionMutations.deleteTransaction(id, transaction?.description);
+	};
 
 	return (
 		<div className="container py-8 space-y-6">
 			{/* Status Message */}
-			{message && (
+			{transactionMutations.message && (
 				<div
-					className={`rounded-md border p-3 shadow-sm border-${messageType}-200 bg-${messageType}-50 text-${messageType}-600`}
+					className={`rounded-md border p-3 shadow-sm border-${transactionMutations.messageType}-200 bg-${transactionMutations.messageType}-50 text-${transactionMutations.messageType}-600`}
 					role="status"
 					aria-live="polite"
 				>
-					{message}
+					{transactionMutations.message}
 				</div>
 			)}
 
@@ -189,6 +156,7 @@ export default function TransactionsPage() {
 					</div>
 				</Card>
 			)}
+
 			<Card 
 				ref={transactionFormRef} 
 				className={`p-6 motion-safe:transition-colors motion-safe:duration-300 ${
@@ -244,6 +212,14 @@ export default function TransactionsPage() {
 				)}
 			</Card>
 
+			{/* Filters */}
+			<TransactionFilters
+				filters={transactionFilters.filters}
+				onFiltersChange={transactionFilters.onFiltersChange}
+				onClearFilters={transactionFilters.onClearFilters}
+				loading={transactionFilters.isLoading}
+			/>
+
 			{/* Transactions List */}
 			<Card className="p-6 relative">
 				<div className="flex items-center justify-between mb-4">
@@ -251,29 +227,42 @@ export default function TransactionsPage() {
 						Your Transactions
 					</h2>
 					<div className="text-sm text-neutral-600">
-						{total > 0 && `${total} total transactions`}
+						{transactionPagination.total > 0 && `${transactionPagination.total} total transactions`}
 					</div>
 				</div>
 				<TransactionList
 					items={items}
 					onEdit={onEdit}
 					onDelete={onDelete}
-					loading={status === "loading"}
+					loading={transactionPagination.isLoading}
 				/>
 			</Card>
 
-			{/* Pagination Placeholder */}
-			{total > 20 && (
-				<Card className="p-4">
-					<div className="flex justify-center">
-						<div className="p-4 rounded-md border-2 border-dashed border-neutral-200 text-center">
-							<p className="text-neutral-600">Pagination controls coming soon</p>
-							<p className="text-sm text-neutral-500">
-								Showing {items.length} of {total} transactions
-							</p>
-						</div>
-					</div>
+			{/* Pagination */}
+			{transactionPagination.total > 0 && (
+				<Card className="p-0">
+					<TransactionPagination
+						pagination={transactionPagination.pagination}
+						total={transactionPagination.total}
+						onPageChange={transactionPagination.onPageChange}
+						onLimitChange={transactionPagination.onLimitChange}
+						loading={transactionPagination.isLoading}
+					/>
 				</Card>
+			)}
+
+			{/* Load More Button (alternative to pagination) */}
+			{transactionPagination.pagination.hasNext && (
+				<div className="flex justify-center">
+					<Button
+						variant="outline"
+						onClick={transactionPagination.onLoadMore}
+						disabled={transactionPagination.isLoading}
+						className="px-8"
+					>
+						{transactionPagination.isLoading ? "Loading..." : "Load More Transactions"}
+					</Button>
+				</div>
 			)}
 		</div>
 	);

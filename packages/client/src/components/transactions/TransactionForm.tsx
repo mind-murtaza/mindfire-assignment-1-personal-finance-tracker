@@ -11,7 +11,7 @@ import {
 } from "../../lib/validation/transaction";
 import type { CategoryType } from "../../lib/validation/common";
 
-import { formatDateForInput } from "../../lib/utils/formatters";
+import { formatDateForInput, CURRENCY } from "../../lib/utils/formatters";
 
 interface Props {
 	onSubmit: (data: TransactionCreateInput | TransactionUpdateInput) => void | Promise<void>;
@@ -236,7 +236,7 @@ export default function TransactionForm({
 					htmlFor="amount"
 					className="block text-sm font-medium text-neutral-700 mb-2"
 				>
-					Amount ($)
+					Amount ({CURRENCY.INR})
 				</label>
 				<Input
 					id="amount"

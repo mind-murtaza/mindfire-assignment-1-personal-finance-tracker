@@ -2,7 +2,7 @@
  * Utility functions for formatting data consistently across the application
  */
 
-const CURRENCY = {
+export const CURRENCY = {
     INR: "₹",
     USD: "$",
     EUR: "€"

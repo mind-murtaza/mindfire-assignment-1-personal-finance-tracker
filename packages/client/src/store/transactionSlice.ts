@@ -26,6 +26,12 @@ import { createLogger } from "../lib/logger";
 
 const log = createLogger("transactions");
 
+// Serializable version of TransactionListQuery for Redux state
+type SerializableTransactionListQuery = Omit<TransactionListQuery, 'startDate' | 'endDate'> & {
+	startDate?: string | Date; // Allow both for transition
+	endDate?: string | Date;   // Allow both for transition
+};
+
 export interface TransactionsState {
 	// Normalized state
 	byId: Record<string, Transaction>;
@@ -47,8 +53,8 @@ export interface TransactionsState {
 	summaryStatus: "idle" | "loading" | "succeeded" | "failed";
 	breakdownStatus: "idle" | "loading" | "succeeded" | "failed";
 	
-	// Filters (for UI state)
-	currentFilters: Partial<TransactionListQuery>;
+	// Filters (for UI state) - uses serializable version
+	currentFilters: Partial<SerializableTransactionListQuery>;
 	
 	// Category breakdown
 	categoryBreakdown: CategoryBreakdown[];
@@ -82,14 +88,23 @@ export const fetchTransactions = createAsyncThunk(
 	"transactions/fetchAll",
 	async (query: Partial<TransactionListQuery> = {}, { rejectWithValue }) => {
 		try {
-			if (!query.startDate && !query.endDate) {
+			// Create a copy and convert ISO strings back to Date objects for API call
+			const apiQuery = { ...query };
+			if (typeof apiQuery.startDate === 'string') {
+				apiQuery.startDate = new Date(apiQuery.startDate);
+			}
+			if (typeof apiQuery.endDate === 'string') {
+				apiQuery.endDate = new Date(apiQuery.endDate);
+			}
+			
+			if (!apiQuery.startDate && !apiQuery.endDate) {
 				const now = new Date();
 				const sevenDaysAgo = new Date(now);
 				sevenDaysAgo.setDate(now.getDate() - 7);
-				query.startDate = sevenDaysAgo;
-				query.endDate = now;
+				apiQuery.startDate = sevenDaysAgo;
+				apiQuery.endDate = now;
 			}
-			const res = await listTransactions(query);
+			const res = await listTransactions(apiQuery);
 			return res;
 		} catch (error) {
 			log.error("fetchAll failed", error);
@@ -174,6 +189,40 @@ export const fetchCategoryBreakdown = createAsyncThunk(
 	}
 );
 
+export const loadMoreTransactions = createAsyncThunk(
+	"transactions/loadMore",
+	async (query: Partial<TransactionListQuery> = {}, { rejectWithValue, getState }) => {
+		try {
+			const state = getState() as { transactions: TransactionsState };
+			const nextPage = state.transactions.pagination.page + 1;
+			
+			// Create a copy and convert ISO strings back to Date objects for API call
+			const apiQuery = { ...query };
+			if (typeof apiQuery.startDate === 'string') {
+				apiQuery.startDate = new Date(apiQuery.startDate);
+			}
+			if (typeof apiQuery.endDate === 'string') {
+				apiQuery.endDate = new Date(apiQuery.endDate);
+			}
+			
+			// Default to last 7 days if no date filters
+			if (!apiQuery.startDate && !apiQuery.endDate) {
+				const now = new Date();
+				const sevenDaysAgo = new Date(now);
+				sevenDaysAgo.setDate(now.getDate() - 7);
+				apiQuery.startDate = sevenDaysAgo;
+				apiQuery.endDate = now;
+			}
+			
+			const res = await listTransactions({ ...apiQuery, page: nextPage });
+			return res;
+		} catch (error) {
+			log.error("loadMore failed", error);
+			return rejectWithValue("Failed to load more transactions");
+		}
+	}
+);
+
 export const cloneTransactionThunk = createAsyncThunk(
 	"transactions/clone",
 	async (
@@ -232,8 +281,16 @@ const slice = createSlice({
 	name: "transactions",
 	initialState,
 	reducers: {
-		setFilters(state, action: PayloadAction<Partial<TransactionListQuery>>) {
-			state.currentFilters = { ...state.currentFilters, ...action.payload };
+		setFilters(state, action: PayloadAction<Partial<SerializableTransactionListQuery>>) {
+			const filters: Partial<SerializableTransactionListQuery> = { ...action.payload };
+			// Convert Date objects to ISO strings for Redux serialization
+			if (filters.startDate instanceof Date) {
+				filters.startDate = filters.startDate.toISOString();
+			}
+			if (filters.endDate instanceof Date) {
+				filters.endDate = filters.endDate.toISOString();
+			}
+			state.currentFilters = { ...state.currentFilters, ...filters };
 		},
 		clearFilters(state) {
 			state.currentFilters = {};
@@ -290,17 +347,52 @@ const slice = createSlice({
 				state.error = (action.payload as string) ?? "Failed to load transactions";
 			})
 
-			// Create transaction
+			// Load more transactions (append to existing)
+			.addCase(loadMoreTransactions.pending, (state) => {
+				state.status = "loading";
+				state.error = null;
+			})
 			.addCase(
-				createTransactionThunk.fulfilled,
-				(state, action: PayloadAction<Transaction>) => {
-					const transaction = action.payload;
-					state.byId[transaction._id] = transaction;
-					state.allIds.unshift(transaction._id);
-					state.total += 1;
-					updateSummary(state, transaction);
+				loadMoreTransactions.fulfilled,
+				(state, action: PayloadAction<TransactionListResponse>) => {
+					state.status = "succeeded";
+					const { transactions, total, pagination } = action.payload;
+					
+					// Append new transactions (don't clear existing)
+					for (const transaction of transactions) {
+						if (!state.byId[transaction._id]) {
+							updateSummary(state, transaction);
+							state.byId[transaction._id] = transaction;
+							state.allIds.push(transaction._id);
+						}
+					}
+					
+					state.total = total;
+					state.pagination = pagination;
 				}
 			)
+			.addCase(loadMoreTransactions.rejected, (state, action) => {
+				state.status = "failed";
+				state.error = (action.payload as string) ?? "Failed to load more transactions";
+			})
+
+					// Create transaction
+		.addCase(createTransactionThunk.pending, (state) => {
+			state.error = null;
+		})
+		.addCase(
+			createTransactionThunk.fulfilled,
+			(state, action: PayloadAction<Transaction>) => {
+				const transaction = action.payload;
+				state.byId[transaction._id] = transaction;
+				state.allIds.unshift(transaction._id);
+				state.total += 1;
+				updateSummary(state, transaction);
+			}
+		)
+		.addCase(createTransactionThunk.rejected, (state, action) => {
+			state.error = (action.payload as string) ?? "Failed to create transaction";
+		})
 
 			// Get transaction by ID
 			.addCase(
@@ -315,49 +407,67 @@ const slice = createSlice({
 				}
 			)
 
-			// Update transaction
-			.addCase(
-				updateTransactionThunk.fulfilled,
-				(state, action: PayloadAction<Transaction>) => {
-					const newTransaction = action.payload;
-					const oldTransactionProxy = state.byId[newTransaction._id];
-					const oldTransaction = oldTransactionProxy ? current(oldTransactionProxy) : null;
-					if (oldTransaction) {
-						recalculateSummaryOnTransactionUpdate(state, oldTransaction, newTransaction);
-					} else {
-						updateSummary(state, newTransaction, "add");
-					}
-					state.byId[newTransaction._id] = newTransaction;
-					if (!state.allIds.includes(newTransaction._id)) {
-						state.allIds.push(newTransaction._id);
-					}
+					// Update transaction
+		.addCase(updateTransactionThunk.pending, (state) => {
+			state.error = null;
+		})
+		.addCase(
+			updateTransactionThunk.fulfilled,
+			(state, action: PayloadAction<Transaction>) => {
+				const newTransaction = action.payload;
+				const oldTransactionProxy = state.byId[newTransaction._id];
+				const oldTransaction = oldTransactionProxy ? current(oldTransactionProxy) : null;
+				if (oldTransaction) {
+					recalculateSummaryOnTransactionUpdate(state, oldTransaction, newTransaction);
+				} else {
+					updateSummary(state, newTransaction, "add");
 				}
-			)
+				state.byId[newTransaction._id] = newTransaction;
+				if (!state.allIds.includes(newTransaction._id)) {
+					state.allIds.push(newTransaction._id);
+				}
+			}
+		)
+		.addCase(updateTransactionThunk.rejected, (state, action) => {
+			state.error = (action.payload as string) ?? "Failed to update transaction";
+		})
 
-			// Delete transaction
-			.addCase(
-				deleteTransactionThunk.fulfilled,
-				(state, action: PayloadAction<string>) => {
-					const id = action.payload;
-					const transaction = state.byId[id];
-					delete state.byId[id];
-					state.allIds = state.allIds.filter((x) => x !== id);
-					state.total -= 1;
-					updateSummary(state, transaction, "subtract");
-				}
-			)
+					// Delete transaction
+		.addCase(deleteTransactionThunk.pending, (state) => {
+			state.error = null;
+		})
+		.addCase(
+			deleteTransactionThunk.fulfilled,
+			(state, action: PayloadAction<string>) => {
+				const id = action.payload;
+				const transaction = state.byId[id];
+				delete state.byId[id];
+				state.allIds = state.allIds.filter((x) => x !== id);
+				state.total -= 1;
+				updateSummary(state, transaction, "subtract");
+			}
+		)
+		.addCase(deleteTransactionThunk.rejected, (state, action) => {
+			state.error = (action.payload as string) ?? "Failed to delete transaction";
+		})
 
-			// Clone transaction
-			.addCase(
-				cloneTransactionThunk.fulfilled,
-				(state, action: PayloadAction<Transaction>) => {
-					const transaction = action.payload;
-					state.byId[transaction._id] = transaction;
-					state.allIds.unshift(transaction._id); // Add to beginning
-					state.total += 1;
-					updateSummary(state, transaction);
-				}
-			)
+					// Clone transaction
+		.addCase(cloneTransactionThunk.pending, (state) => {
+			state.error = null;
+		})
+		.addCase(
+			cloneTransactionThunk.fulfilled,
+			(state, action: PayloadAction<Transaction>) => {
+				const transaction = action.payload;
+				state.byId[transaction._id] = transaction;
+				state.allIds.unshift(transaction._id); // Add to beginning
+				state.total += 1;
+				updateSummary(state, transaction);
+			}
+		)
+		.addCase(cloneTransactionThunk.rejected, (state, action) => {
+			state.error = (action.payload as string) ?? "Failed to clone transaction";
+		})
 
 			// Summary
 			.addCase(fetchTransactionSummary.pending, (state) => {
