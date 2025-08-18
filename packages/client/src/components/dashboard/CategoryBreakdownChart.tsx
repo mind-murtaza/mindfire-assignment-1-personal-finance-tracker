@@ -11,15 +11,17 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 interface CategoryBreakdownChartProps {
 	data: CategoryBreakdown[];
 	isLoading?: boolean;
+	type: "income" | "expense";
+	title: string;
 }
 
 export default function CategoryBreakdownChart({
 	data,
 	isLoading,
+	type,
+	title,
 }: CategoryBreakdownChartProps) {
 	const chartData = useMemo(() => {
-		console.log("🎨 CategoryBreakdownChart received data:", data);
-		
 		if (!data || data.length === 0) {
 			return {
 				labels: ["No data available"],
@@ -34,17 +36,15 @@ export default function CategoryBreakdownChart({
 			};
 		}
 
-		// Filter only expenses for spending breakdown and sort by total amount descending
-		const expenseData = data
-			.filter((item) => item.type === "expense")
+		// Filter by type and sort by total amount descending
+		const filteredData = data
+			.filter((item) => item.type === type)
 			.sort((a, b) => b.total - a.total)
 			.slice(0, 6);
 
-		console.log("🎨 Filtered expense data for chart:", expenseData);
-
-		if (expenseData.length === 0) {
+		if (filteredData.length === 0) {
 			return {
-				labels: ["No expense data"],
+				labels: [`No ${type} data`],
 				datasets: [
 					{
 						data: [1],
@@ -56,13 +56,15 @@ export default function CategoryBreakdownChart({
 			};
 		}
 
+		const defaultColor = type === "income" ? "#10b981" : "#6366f1";
+
 		return {
-			labels: expenseData.map((item) => item.categoryName),
+			labels: filteredData.map((item) => item.categoryName),
 			datasets: [
 				{
-					data: expenseData.map((item) => item.total),
-					backgroundColor: expenseData.map(
-						(item) => item.categoryColor || "#6366f1"
+					data: filteredData.map((item) => item.total),
+					backgroundColor: filteredData.map(
+						(item) => item.categoryColor || defaultColor
 					),
 					borderColor: "#ffffff",
 					borderWidth: 2,
@@ -70,7 +72,7 @@ export default function CategoryBreakdownChart({
 				},
 			],
 		};
-	}, [data]);
+	}, [data, type]);
 
 	const options: ChartOptions<"doughnut"> = useMemo(
 		() => ({
@@ -80,10 +82,11 @@ export default function CategoryBreakdownChart({
 				legend: {
 					position: "bottom" as const,
 					labels: {
-						padding: 16,
+						padding: 12,
 						usePointStyle: true,
+						boxWidth: 12,
 						font: {
-							size: 12,
+							size: 11,
 							family:
 								'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial',
 						},
@@ -139,9 +142,9 @@ export default function CategoryBreakdownChart({
 				<div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-4">
 					<div className="w-8 h-8 bg-neutral-200 rounded-full"></div>
 				</div>
-				<p className="text-sm font-medium">No spending data available</p>
+				<p className="text-sm font-medium">No {type === "expense" ? "spending" : "earning"} data available</p>
 				<p className="text-xs text-neutral-400 mt-1">
-					Add some transactions to see the breakdown
+					Add some {type} transactions to see the breakdown
 				</p>
 			</div>
 		);
@@ -149,7 +152,7 @@ export default function CategoryBreakdownChart({
 
 	return (
 		<div className="relative">
-			<div className="h-64">
+			<div className="min-h-64 md:min-h-72">
 				<Doughnut
 					data={chartData}
 					options={options}
@@ -158,15 +161,15 @@ export default function CategoryBreakdownChart({
 				/>
 			</div>
 
-			{/* Center text showing total */}
-			<div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-				<span className="text-xs text-neutral-500 font-medium">
-					Total Spent
+			{/* Center text showing total - positioned absolutely over the chart */}
+			<div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center" style={{ top: '20%', height: '40%' }}>
+				<span className="text-xs font-medium text-neutral-500 md:text-sm">
+					{title}
 				</span>
-				<span className="text-lg font-semibold text-neutral-900">
+				<span className="mt-1 text-xl font-semibold text-neutral-900 md:text-2xl">
 					{formatCurrency(
 						data
-							.filter((item) => item.type === "expense")
+							.filter((item) => item.type === type)
 							.reduce((sum, item) => sum + item.total, 0)
 					)}
 				</span>
@@ -175,7 +178,7 @@ export default function CategoryBreakdownChart({
 			{/* Screen reader accessible data table */}
 			<div className="sr-only">
 				<table>
-					<caption>Category spending breakdown</caption>
+					<caption>Category {type} breakdown</caption>
 					<thead>
 						<tr>
 							<th>Category</th>
@@ -185,7 +188,7 @@ export default function CategoryBreakdownChart({
 					</thead>
 					<tbody>
 						{data
-							.filter((item) => item.type === "expense")
+							.filter((item) => item.type === type)
 							.map((item) => (
 								<tr key={item.categoryId}>
 									<td>{item.categoryName}</td>

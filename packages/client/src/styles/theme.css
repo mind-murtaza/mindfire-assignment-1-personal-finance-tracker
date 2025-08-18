@@ -1,29 +1,3 @@
-/*
-  Tailwind v4 @theme usage guide (read me before styling):
-
-  - These tokens power Tailwind utility classes automatically.
-  - DO NOT use raw CSS vars like var(--color-primary-600) in components.
-    Always use Tailwind classes so theming stays consistent.
-
-  Examples:
-    Text colors:       text-primary-600, text-neutral-900, text-error-600
-    Background colors: bg-primary-50, bg-success-50, bg-neutral-50
-    Borders:           border-primary-200, border-success-200, border-neutral-200
-    Rings:             focus-visible:ring-primary-500
-
-  Component recipes (from Theme.md) translate 1:1 to classes, e.g.:
-    - Status badge (success):
-        inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-        bg-success-50 text-success-600 border border-success-200
-    - Error text:
-        text-error-600
-    - Heading:
-        text-neutral-900
-
-  If you need a new token, add it below (e.g., --color-warning-200),
-  then use it via Tailwind as bg-warning-200, text-warning-200, etc.
-*/
-
 @theme {
   /* Brand (Indigo) */
   --color-primary-50: #eef2ff;

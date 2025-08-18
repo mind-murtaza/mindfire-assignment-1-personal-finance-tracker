@@ -34,16 +34,12 @@ export default function Dashboard() {
 	} = useQuery({
 		queryKey: ["transaction-summary", currentYear, currentMonth],
 		queryFn: async () => {
-			console.log("🔍 Fetching summary for:", {
-				year: currentYear,
-				month: currentMonth,
-			});
+
 			try {
 				const result = await getTransactionSummary({
 					year: currentYear,
 					month: currentMonth,
 				});
-				console.log("📊 Summary result:", result);
 				return result;
 			} catch (error) {
 				console.error("❌ Summary error:", error);
@@ -58,17 +54,9 @@ export default function Dashboard() {
 		queryFn: async () => {
 			const startDate = new Date(currentYear, currentMonth - 1, 1);
 			const endDate = new Date(currentYear, currentMonth, 0);
-			console.log("🔍 Fetching breakdown for date range:", {
-				startDate: startDate.toISOString(),
-				endDate: endDate.toISOString(),
-				currentYear,
-				currentMonth,
-				startDateLocal: startDate.toLocaleDateString(),
-				endDateLocal: endDate.toLocaleDateString(),
-			});
+			
 			try {
 				const result = await getCategoryBreakdown({ startDate, endDate });
-				console.log("📈 Breakdown result:", result);
 				return result;
 			} catch (error) {
 				console.error("❌ Breakdown error:", error);
@@ -82,10 +70,9 @@ export default function Dashboard() {
 		{
 			queryKey: ["recent-transactions"],
 			queryFn: async () => {
-				console.log("🔍 Fetching recent transactions");
+
 				try {
 					const result = await listTransactions({ limit: 5, page: 1 });
-					console.log("📝 Recent transactions result:", result);
 					return result;
 				} catch (error) {
 					console.error("❌ Recent transactions error:", error);
@@ -118,35 +105,15 @@ export default function Dashboard() {
 					previousSummary.expenses.total) *
 			  100
 			: 0;
-
-	// Debug logging
-	console.log("🎯 Dashboard state:", {
-		currentSummary,
-		categoryBreakdown,
-		recentTransactions,
-		summaryLoading,
-		breakdownLoading,
-		transactionsLoading,
-		summaryError,
-		currentYear,
-		currentMonth,
-	});
-
 	// Check if we have any data at all
 	const hasAnyData =
 		(currentSummary?.income.total || 0) > 0 ||
 		(currentSummary?.expenses.total || 0) > 0 ||
 		(recentTransactions?.transactions?.length || 0) > 0;
 
-	console.log("📊 Data status:", {
-		hasAnyData,
-		summaryData: currentSummary,
-		transactionCount: recentTransactions?.transactions?.length || 0,
-		breakdownCount: categoryBreakdown?.length || 0,
-	});
-
+	
 	if (summaryError) {
-		console.error("❌ Dashboard error:", summaryError);
+
 		return (
 			<div className="container py-8">
 				<div className="text-center">
@@ -172,20 +139,20 @@ export default function Dashboard() {
 	// Show empty state if no data and not loading
 	if (!summaryLoading && !transactionsLoading && !hasAnyData) {
 		return (
-			<div className="container py-8">
-				<div className="text-center py-16">
-					<div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-						<IndianRupee className="w-8 h-8 text-neutral-400" />
+			<div className="container py-6 sm:py-8">
+				<div className="text-center py-12 sm:py-16 px-4">
+					<div className="w-12 h-12 sm:w-16 sm:h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
+						<IndianRupee className="w-6 h-6 sm:w-8 sm:h-8 text-neutral-400" />
 					</div>
-					<h1 className="text-2xl font-semibold text-neutral-900 mb-2">
+					<h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 mb-2">
 						Welcome to Your Dashboard!
 					</h1>
-					<p className="text-neutral-600 mb-6">
+					<p className="text-sm sm:text-base text-neutral-600 mb-6 max-w-md mx-auto">
 						You haven't added any transactions yet. Start tracking your finances
 						by adding your first transaction.
 					</p>
 					<Link to="/transactions?action=add">
-						<Button className="inline-flex items-center gap-2">
+						<Button className="inline-flex items-center gap-2 w-full sm:w-auto">
 							<Plus className="h-4 w-4" aria-hidden="true" />
 							Add Your First Transaction
 						</Button>
@@ -196,26 +163,28 @@ export default function Dashboard() {
 	}
 
 	return (
-		<div className="container py-8">
+		<div className="container py-6 sm:py-8">
 			{/* Header */}
-			<div className="flex items-center justify-between mb-8">
-				<div>
-					<h1 className="text-3xl font-semibold text-neutral-900">Dashboard</h1>
-					<p className="text-neutral-600 mt-1">
+			<div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
+				<div className="min-w-0 flex-1">
+					<h1 className="text-2xl font-semibold text-neutral-900 sm:text-3xl">Dashboard</h1>
+					<p className="text-sm text-neutral-600 mt-1 sm:text-base">
 						Welcome back! Here's your financial overview for{" "}
 						{currentSummary?.yearMonth || "this month"}.
 					</p>
 				</div>
-				<Link to="/transactions?action=add">
-					<Button className="inline-flex items-center gap-2">
-						<Plus className="h-4 w-4" aria-hidden="true" />
-						Add Transaction
-					</Button>
-				</Link>
+				<div className="flex-shrink-0">
+					<Link to="/transactions?action=add">
+						<Button className="inline-flex items-center gap-2 w-full sm:w-auto">
+							<Plus className="h-4 w-4" aria-hidden="true" />
+							<span className="sm:inline">Add Transaction</span>
+						</Button>
+					</Link>
+				</div>
 			</div>
 
 			{/* Summary Cards */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
 				<SummaryCard
 					title="Total Income"
 					amount={currentSummary?.income.total || 0}
@@ -245,24 +214,43 @@ export default function Dashboard() {
 			</div>
 
 			{/* Charts Row */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-				{/* Category Breakdown Chart */}
-				<Card className="p-6">
+			<div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+				{/* Category Breakdown Charts */}
+				<Card className="p-4 sm:p-6">
 					<div className="flex items-center gap-2 mb-4">
-						<PieChart className="h-5 w-5 text-primary-600" aria-hidden="true" />
-						<h2 className="text-lg font-semibold text-neutral-900">
+						<PieChart className="h-4 w-4 sm:h-5 sm:w-5 text-error-600" aria-hidden="true" />
+						<h2 className="text-base sm:text-lg font-semibold text-neutral-900">
 							Spending by Category
 						</h2>
 					</div>
 					<CategoryBreakdownChart
 						data={categoryBreakdown || []}
 						isLoading={breakdownLoading}
+						type="expense"
+						title="Total Spent"
 					/>
 				</Card>
 
-				{/* Monthly Trends Chart */}
-				<Card className="p-6">
-					<h2 className="text-lg font-semibold text-neutral-900 mb-4">
+				<Card className="p-4 sm:p-6">
+					<div className="flex items-center gap-2 mb-4">
+						<PieChart className="h-4 w-4 sm:h-5 sm:w-5 text-success-600" aria-hidden="true" />
+						<h2 className="text-base sm:text-lg font-semibold text-neutral-900">
+							Earning by Category
+						</h2>
+					</div>
+					<CategoryBreakdownChart
+						data={categoryBreakdown || []}
+						isLoading={breakdownLoading}
+						type="income"
+						title="Total Earned"
+					/>
+				</Card>
+			</div>
+
+			{/* Monthly Trends Chart */}
+			<div className="mb-6 sm:mb-8">
+				<Card className="p-4 sm:p-6">
+					<h2 className="text-base sm:text-lg font-semibold text-neutral-900 mb-4">
 						Monthly Trends
 					</h2>
 					<MonthlyTrendsChart />
@@ -270,14 +258,14 @@ export default function Dashboard() {
 			</div>
 
 			{/* Recent Transactions */}
-			<Card className="p-6">
+			<Card className="p-4 sm:p-6">
 				<div className="flex items-center justify-between mb-4">
-					<h2 className="text-lg font-semibold text-neutral-900">
+					<h2 className="text-base sm:text-lg font-semibold text-neutral-900">
 						Recent Transactions
 					</h2>
 					<Link
 						to="/transactions"
-						className="text-primary-600 hover:text-primary-700 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-sm"
+						className="text-primary-600 hover:text-primary-700 text-xs sm:text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-sm"
 					>
 						View All
 					</Link>
