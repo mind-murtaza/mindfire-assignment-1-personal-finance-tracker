@@ -46,6 +46,10 @@ async function createDefaultCategories(userId) {
 
 async function createTransactions(userId, count = 50) {
   const allCats = await Category.find({ userId, isDeleted: false }).lean();
+    if (allCats.length === 0) {
+    console.log(`No categories found for user ${userId}. Skipping transaction creation.`);
+    return;
+  }
   for (let i = 0; i < count; i++) {
     const cat = pick(allCats);
     const isIncome = cat.type === 'income';
@@ -56,28 +60,31 @@ async function createTransactions(userId, count = 50) {
       type: cat.type,
       amount,
       description: isIncome ? 'Salary/Bonus' : faker.commerce.productName(),
-      transactionDate: faker.date.recent({ days: 60 }),
+      transactionDate: faker.date.recent({ days: 30 }),
       tags: isIncome ? ['salary'] : ['food']
     });
   }
 }
 
 async function main() {
-  const usersToCreate = Number(process.argv[2] || 3);
+  const userId = '689c6d6484a885c2cd23c19e';
+  const transactionCount = 500;
 
-  // Use shared DB config (respects MONGO_URI and retry logic)
+  console.log('Connecting to database...');
   await connectDB();
+  console.log('Database connected.');
 
-  for (let i = 1; i <= usersToCreate; i++) {
-    const user = await createUser(i);
-    await createDefaultCategories(user._id);
-    const txnCount = 20 + Math.floor(Math.random() * 21); // 20-40
-    await createTransactions(user._id, txnCount);
-    console.log(`➡️  Seeded user ${user.email} with ${txnCount} transactions`);
+  try {
+    console.log(`Seeding ${transactionCount} transactions for user ${userId}...`);
+    await createTransactions(userId, transactionCount);
+    console.log('Seeding completed successfully.');
+  } catch (error) {
+    console.error('An error occurred during seeding:', error);
+  } finally {
+    console.log('Disconnecting from database...');
+    await disconnect();
+    console.log('Database disconnected.');
   }
-
-  await disconnect();
-  console.log('🌱 Seeding completed.');
 }
 
 main().catch(async (err) => {

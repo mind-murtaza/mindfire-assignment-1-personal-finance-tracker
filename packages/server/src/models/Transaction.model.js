@@ -504,22 +504,38 @@ TransactionSchema.statics.getMonthlySummary = async function(userId, year, month
  * Get category breakdown for user
  * @param {ObjectId} userId - User ID
  * @param {Object} dateRange - Date range filter
+ * @param {string} type - Optional type filter
  * @returns {Promise<Array>} - Category breakdown
  */
-TransactionSchema.statics.getCategoryBreakdown = async function(userId, dateRange = {}) {
+TransactionSchema.statics.getCategoryBreakdown = async function(userId, dateRange = {}, type = null) {
   try {
     const matchStage = {
       userId: new mongoose.Types.ObjectId(userId),
       isDeleted: false
     };
     
-    if (dateRange.startDate || dateRange.endDate) {
-      matchStage.transactionDate = {};
-      if (dateRange.startDate) matchStage.transactionDate.$gte = dateRange.startDate;
-      if (dateRange.endDate) matchStage.transactionDate.$lte = dateRange.endDate;
+    // Add type filter if provided
+    if (type) {
+      matchStage.type = type;
     }
     
-    return await this.aggregate([
+    if (dateRange.startDate || dateRange.endDate) {
+      matchStage.transactionDate = {};
+      if (dateRange.startDate) {
+        // Ensure startDate is a proper Date object
+        matchStage.transactionDate.$gte = dateRange.startDate instanceof Date 
+          ? dateRange.startDate 
+          : new Date(dateRange.startDate);
+      }
+      if (dateRange.endDate) {
+        // Ensure endDate is a proper Date object
+        matchStage.transactionDate.$lte = dateRange.endDate instanceof Date 
+          ? dateRange.endDate 
+          : new Date(dateRange.endDate);
+      }
+    }
+    
+    const pipeline = [
       { $match: matchStage },
       {
         $group: {
@@ -541,25 +557,47 @@ TransactionSchema.statics.getCategoryBreakdown = async function(userId, dateRang
         }
       },
       {
-        $unwind: '$category'
+        $unwind: {
+          path: '$category',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          categories: { $push: '$$ROOT' },
+          grandTotal: { $sum: '$total' }
+        }
+      },
+      {
+        $unwind: '$categories'
       },
       {
         $project: {
-          categoryId: '$_id.categoryId',
-          categoryName: '$category.name',
-          categoryColor: '$category.color',
-          categoryIcon: '$category.icon',
-          type: '$_id.type',
-          total: 1,
-          count: 1,
-          avgAmount: 1,
-          percentage: 1
+          _id: 0,
+          categoryId: '$categories._id.categoryId',
+          categoryName: '$categories.category.name',
+          categoryColor: '$categories.category.color',
+          categoryIcon: '$categories.category.icon',
+          type: '$categories._id.type',
+          total: '$categories.total',
+          count: '$categories.count',
+          avgAmount: '$categories.avgAmount',
+          percentage: {
+            $cond: [
+              { $eq: ['$grandTotal', 0] },
+              0,
+              { $multiply: [{ $divide: ['$categories.total', '$grandTotal'] }, 100] }
+            ]
+          }
         }
       },
       {
         $sort: { total: -1 }
       }
-    ]);
+    ];
+
+    return await this.aggregate(pipeline);
   } catch (error) {
     if (error.status) throw error;
     const modelError = new Error('Failed to generate category breakdown');

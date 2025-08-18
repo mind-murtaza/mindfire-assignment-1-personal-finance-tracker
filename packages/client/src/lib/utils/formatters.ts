@@ -75,7 +75,7 @@ export function formatDateForInput(date: Date): string {
  * @returns Formatted currency string
  */
 export function formatCurrency(amount: number): string {
-	return `$${Math.abs(amount).toFixed(2)}`;
+	return `${CURRENCY.INR}${Math.abs(amount).toFixed(2)}`;
 }
 
 /**

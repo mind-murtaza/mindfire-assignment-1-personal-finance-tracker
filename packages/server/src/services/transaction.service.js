@@ -412,14 +412,10 @@ async function getCategoryBreakdown(userId, options = {}) {
     if (options.startDate) dateRange.startDate = options.startDate;
     if (options.endDate) dateRange.endDate = options.endDate;
 
-    let breakdown = await Transaction.getCategoryBreakdown(userId, dateRange);
+    
+    const transactionBreakdown = await Transaction.getCategoryBreakdown(userId, dateRange, options.type);
 
-    // Filter by type if specified
-    if (options.type) {
-      breakdown = breakdown.filter(item => item.type === options.type);
-    }
-
-    return breakdown;
+    return transactionBreakdown;
   } catch (error) {
     if (error.status) throw error;
     const serviceError = new Error('Failed to generate category breakdown');

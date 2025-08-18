@@ -82,7 +82,6 @@ type BreakdownResponse = { success?: boolean; data?: CategoryBreakdown[] };
 export async function listTransactions(
 	query?: Partial<TransactionListQuery>
 ): Promise<TransactionListResponse> {
-	log.debug("list", query);
 	const res = await http.get<ListResponse>("/transactions", { params: query });
 	return (
 		res.data.data ?? {
@@ -140,7 +139,6 @@ export async function deleteTransaction(id: string): Promise<void> {
 export async function getTransactionSummary(
 	query?: TransactionSummaryQuery
 ): Promise<SummaryResponse["data"]> {
-	log.debug("summary", query);
 	const res = await http.get<SummaryResponse>("/transactions/summary", {
 		params: query,
 	});
@@ -150,7 +148,6 @@ export async function getTransactionSummary(
 export async function getCategoryBreakdown(
 	query?: TransactionBreakdownQuery
 ): Promise<CategoryBreakdown[]> {
-	log.debug("breakdown", query);
 	const res = await http.get<BreakdownResponse>(
 		"/transactions/category-breakdown",
 		{ params: query }
