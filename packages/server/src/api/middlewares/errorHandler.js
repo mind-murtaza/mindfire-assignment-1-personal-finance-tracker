@@ -1,17 +1,9 @@
 /**
- * @fileoverview Enterprise Error Handler Middleware - Comprehensive Error Management
+ * @fileoverview EComprehensive Error Management
  * 
  * Provides centralized error handling with advanced features including error classification,
  * structured logging, security filtering, request context tracking, and monitoring integration.
  * 
- * Features:
- * - Intelligent error classification and status code mapping
- * - Structured logging with request context and user information
- * - Security-aware error filtering for production environments
- * - Consistent error response formatting across all endpoints
- * - Performance monitoring and error rate tracking
- * - Integration with external monitoring services (future)
- * - Request correlation IDs for distributed tracing
  * 
  * @module middlewares/errorHandler
  * @author Murtaza
@@ -113,18 +105,6 @@ const SENSITIVE_PATTERNS = [
   /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g // Email addresses (in some contexts)
 ];
 
-/**
- * Error metrics for monitoring
- * @type {Object}
- */
-const errorMetrics = {
-  totalErrors: 0,
-  errorsByCategory: {},
-  errorsBySeverity: {},
-  errorsByStatus: {},
-  lastErrorTime: null,
-  averageResponseTime: 0
-};
 
 // =================================================================
 // UTILITY FUNCTIONS
@@ -264,34 +244,6 @@ function logError(error, context, classification) {
 }
 
 /**
- * Update error metrics for monitoring
- * @param {Object} classification - Error classification
- * @param {number} responseTime - Response time in milliseconds
- */
-function updateErrorMetrics(classification, responseTime) {
-  if (!ERROR_CONFIG.TRACK_ERROR_METRICS) return;
-  
-  errorMetrics.totalErrors++;
-  errorMetrics.lastErrorTime = Date.now();
-  
-  // Update category metrics
-  errorMetrics.errorsByCategory[classification.category] = 
-    (errorMetrics.errorsByCategory[classification.category] || 0) + 1;
-    
-  // Update severity metrics
-  errorMetrics.errorsBySeverity[classification.severity] = 
-    (errorMetrics.errorsBySeverity[classification.severity] || 0) + 1;
-    
-  // Update status metrics
-  errorMetrics.errorsByStatus[classification.status] = 
-    (errorMetrics.errorsByStatus[classification.status] || 0) + 1;
-    
-  // Update average response time
-  const totalTime = errorMetrics.averageResponseTime * (errorMetrics.totalErrors - 1) + responseTime;
-  errorMetrics.averageResponseTime = totalTime / errorMetrics.totalErrors;
-}
-
-/**
  * Build standardized error response
  * @param {Error} error - Error object
  * @param {Object} context - Request context
@@ -353,8 +305,6 @@ function buildErrorResponse(error, context, classification) {
  * @returns {void} Sends JSON error response
  */
 function errorHandler(err, req, res, next) {
-  const startTime = Date.now();
-  
   // Skip if response already sent
   if (res.headersSent) {
     return next(err);
@@ -373,11 +323,6 @@ function errorHandler(err, req, res, next) {
     // Step 4: Build standardized response
     const errorResponse = buildErrorResponse(err, context, classification);
     
-    // Step 5: Update metrics
-    const responseTime = Date.now() - startTime;
-    updateErrorMetrics(classification, responseTime);
-    
-    // Step 6: Send response
     res.status(classification.status).json(errorResponse);
     
   } catch (handlerError) {
@@ -393,43 +338,12 @@ function errorHandler(err, req, res, next) {
   }
 }
 
-/**
- * Get error metrics for monitoring dashboard
- * @returns {Object} Current error metrics
- */
-function getErrorMetrics() {
-  return {
-    ...errorMetrics,
-    uptime: process.uptime(),
-    errorRate: errorMetrics.totalErrors > 0 ? 
-      (errorMetrics.totalErrors / (process.uptime() / 60)).toFixed(2) + ' errors/min' : '0 errors/min'
-  };
-}
-
-/**
- * Reset error metrics (useful for testing)
- */
-function resetErrorMetrics() {
-  Object.keys(errorMetrics).forEach(key => {
-    if (typeof errorMetrics[key] === 'object') {
-      errorMetrics[key] = {};
-    } else {
-      errorMetrics[key] = 0;
-    }
-  });
-  errorMetrics.lastErrorTime = null;
-}
-
 // =================================================================
 // EXPORTS
 // =================================================================
 
 module.exports = {
   errorHandler,
-  getErrorMetrics,
-  resetErrorMetrics,
-  ERROR_CONFIG,
-  ERROR_CLASSIFICATIONS
 };
 
 // Default export for backward compatibility

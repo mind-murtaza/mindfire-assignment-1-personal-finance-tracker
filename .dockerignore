@@ -9,8 +9,6 @@ packages/server/node_modules
 
 # Environment files (should be passed via docker-compose)
 .env
-packages/server/.env
-packages/client/.env
 
 # IDE / OS specific
 .DS_Store

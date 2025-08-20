@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copy package.json and yarn.lock FIRST to leverage Docker's layer caching.
 # If these files don't change, Docker won't need to re-run 'yarn install'.
-COPY package.json yarn.lock ./
+COPY packages/client/package.json yarn.lock ./
 
 # Install dependencies
 RUN yarn install --frozen-lockfile

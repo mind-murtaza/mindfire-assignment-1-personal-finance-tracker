@@ -5,38 +5,23 @@ services:
   server:
     container_name: finance_tracker_server
     build:
-      context: ./packages/server # Look for the Dockerfile in this directory
-      dockerfile: Dockerfile.dev   # Specify our development Dockerfile
-    command: yarn dev # The command to run when the container starts
+      context: .
+      dockerfile: packages/server/Dockerfile.dev
+    command: yarn dev
     ports:
-      - "4000:4000" # Map host port 4000 to container port 4000
+      - "4000:4000"
     volumes:
-      # This is the magic for live-reloading:
-      # Mounts the local 'server' code into '/app' in the container.
       - ./packages/server:/app
-      # This prevents the local node_modules from overwriting the one in the container.
       - /app/node_modules
-    environment:
-      # Load variables from a .env file in the context directory
-      - MONGO_URI=${MONGO_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=${CORS_ORIGIN}
-      - PORT=4000
-    env_file:
-      - ./packages/server/.env
-
   # The Frontend Service
   client:
     container_name: finance_tracker_client
     build:
-      context: ./packages/client
-      dockerfile: Dockerfile.dev
-    # We add '-- --host' so Vite is accessible from outside the container.
-    # The first '--' separates yarn commands from the script's arguments.
+      context: .
+      dockerfile: packages/client/Dockerfile.dev
     command: yarn dev -- --host
     ports:
-      - "5173:5173" # Map Vite's dev port
+      - "5173:5173"
     volumes:
-      # Same live-reloading magic for the client
       - ./packages/client:/app
       - /app/node_modules
